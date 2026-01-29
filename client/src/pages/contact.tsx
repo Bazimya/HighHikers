@@ -150,8 +150,8 @@ export default function Contact() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-foreground mb-1">Email Us</h3>
-                    <p className="text-sm text-muted-foreground">info@highhikers.com</p>
-                    <p className="text-sm text-muted-foreground">support@highhikers.com</p>
+                    <p className="text-sm text-muted-foreground">highhikers1@gmail.com</p>
+                    <p className="text-sm text-muted-foreground">Contact us for inquiries</p>
                   </div>
                 </div>
               </CardContent>
@@ -165,8 +165,8 @@ export default function Contact() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-foreground mb-1">Call Us</h3>
-                    <p className="text-sm text-muted-foreground">(555) 123-4567</p>
-                    <p className="text-sm text-muted-foreground">Mon-Fri: 9AM - 6PM PST</p>
+                    <p className="text-sm text-muted-foreground">+250 788565306</p>
+                    <p className="text-sm text-muted-foreground">+250 791256980</p>
                   </div>
                 </div>
               </CardContent>
@@ -180,8 +180,8 @@ export default function Contact() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-foreground mb-1">Visit Us</h3>
-                    <p className="text-sm text-muted-foreground">123 Mountain View Drive</p>
-                    <p className="text-sm text-muted-foreground">Mountain View, CA 94040</p>
+                    <p className="text-sm text-muted-foreground">Kigali</p>
+                    <p className="text-sm text-muted-foreground">Rwanda</p>
                   </div>
                 </div>
               </CardContent>
@@ -193,15 +193,11 @@ export default function Contact() {
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Monday - Friday</span>
-                    <span className="text-foreground font-medium">9:00 AM - 6:00 PM</span>
+                    <span className="text-foreground font-medium">8:00 AM - 5:00 PM CAT</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Saturday</span>
-                    <span className="text-foreground font-medium">10:00 AM - 4:00 PM</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Sunday</span>
-                    <span className="text-foreground font-medium">Closed</span>
+                    <span className="text-muted-foreground">Saturday - Sunday</span>
+                    <span className="text-foreground font-medium">Hiking Events</span>
                   </div>
                 </div>
               </CardContent>
@@ -214,13 +210,13 @@ export default function Contact() {
             <CardContent className="p-0">
               <div className="h-96 bg-muted rounded-lg overflow-hidden">
                 <iframe
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3168.6282895034!2d-122.08624968469285!3d37.42206597982488!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x808fba02425dad8f%3A0x6c296c66619367e0!2sGoogleplex!5e0!3m2!1sen!2sus!4v1635780000000!5m2!1sen!2sus"
+                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3989.824662464801!2d29.873395!3d-1.950659!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x19dca4d8-XXXX!2sKigali!5e0!3m2!1sen!2srv!4v1674000000000!5m2!1sen!2srv"
                   width="100%"
                   height="100%"
                   style={{ border: 0 }}
                   allowFullScreen
                   loading="lazy"
-                  title="Office Location Map"
+                  title="Office Location Map - Kigali, Rwanda"
                   data-testid="map-location"
                 ></iframe>
               </div>

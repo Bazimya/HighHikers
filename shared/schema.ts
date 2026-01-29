@@ -310,7 +310,7 @@ export const ContactMessage = mongoose.model<IContactMessage>('ContactMessage', 
 export const userRegisterSchema = z.object({
   username: z.string().min(3).max(30),
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string().min(8),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
 });
@@ -326,6 +326,10 @@ export const trailCreateSchema = z.object({
   latitude: z.number().optional(),
   longitude: z.number().optional(),
   imageUrl: z.string(),
+  featured: z.boolean().optional(),
+  averageRating: z.number().optional(),
+  reviewCount: z.number().optional(),
+  images: z.array(z.object({ url: z.string(), caption: z.string().optional() })).optional(),
 });
 
 export const eventCreateSchema = z.object({
@@ -337,6 +341,9 @@ export const eventCreateSchema = z.object({
   difficulty: z.string(),
   maxParticipants: z.number().optional(),
   imageUrl: z.string(),
+  isPaid: z.boolean().optional(),
+  price: z.number().optional(),
+  currency: z.string().optional(),
 });
 
 export const reviewCreateSchema = z.object({

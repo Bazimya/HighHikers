@@ -25,10 +25,10 @@ export default function Home() {
   const featuredTrails = trails?.filter((t) => t.featured === 1).slice(0, 3) || [];
 
   const stats = [
-    { label: "Trails", value: "500+", icon: Mountain },
-    { label: "Active Hikers", value: "10K+", icon: TrendingUp },
-    { label: "Events/Year", value: "200+", icon: Clock },
-    { label: "Locations", value: "50+", icon: MapPin },
+    { label: "Organized Hikes", value: "15+", icon: Mountain },
+    { label: "Youth Participants", value: "100+", icon: TrendingUp },
+    { label: "Hikes/Week", value: "Weekly", icon: Clock },
+    { label: "Locations", value: "Rwanda", icon: MapPin },
   ];
 
   const getDifficultyColor = (difficulty: string) => {

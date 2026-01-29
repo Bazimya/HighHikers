@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/auth-context";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ export default function AdminDashboard() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("trails");
   const [error, setError] = useState("");
   const [showNewTrailModal, setShowNewTrailModal] = useState(false);
@@ -56,16 +58,23 @@ export default function AdminDashboard() {
   // Create mutations
   const createTrailMutation = useMutation({
     mutationFn: async (data: typeof trailForm) => {
+      console.log("[Admin] Trail form data:", data);
       const res = await fetch("/api/trails", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error("Create failed");
+      console.log("[Admin] Trail creation response status:", res.status);
+      if (!res.ok) {
+        const error = await res.json();
+        console.error("[Admin] Trail creation error:", error);
+        throw new Error(error.details ? JSON.stringify(error.details) : error.error || "Create failed");
+      }
       return res.json();
     },
     onSuccess: () => {
+      toast({ title: "✅ Trail created!", description: "Your new trail has been added successfully." });
       queryClient.invalidateQueries({ queryKey: ["/api/trails"] });
       setTrailForm({ name: "", location: "", difficulty: "medium", distance: "", elevation: "", duration: "", description: "", imageUrl: "" });
       setShowNewTrailModal(false);
@@ -75,11 +84,20 @@ export default function AdminDashboard() {
 
   const createEventMutation = useMutation({
     mutationFn: async (data: typeof eventForm) => {
+      console.log("[Admin] Event form data:", data);
+      
+      // Validate required fields
+      if (!data.title || !data.location || !data.date || !data.time) {
+        throw new Error("Please fill in all required fields: title, location, date, and time");
+      }
+      
       const payload = {
         ...data,
         maxParticipants: data.maxParticipants ? parseInt(data.maxParticipants) : undefined,
         price: data.price ? parseFloat(data.price) : undefined,
       };
+      console.log("[Admin] Sending payload:", payload);
+      
       const res = await fetch("/api/events", {
         method: "POST",
         credentials: "include",
@@ -93,33 +111,47 @@ export default function AdminDashboard() {
       return res.json();
     },
     onSuccess: () => {
+      toast({ title: "✅ Event created!", description: "Your new event has been added successfully." });
       queryClient.invalidateQueries({ queryKey: ["/api/events"] });
       setEventForm({ title: "", location: "", difficulty: "medium", date: "", time: "", maxParticipants: "", description: "", imageUrl: "", isPaid: false, price: "", currency: "RWF" });
       setShowNewEventModal(false);
     },
-    onError: (err) => setError(err.message),
+    onError: (err) => {
+      toast({ title: "❌ Event creation failed", description: err.message, variant: "destructive" });
+      setError(err.message);
+    },
   });
 
   const createBlogMutation = useMutation({
     mutationFn: async (data: typeof blogForm) => {
+      console.log("[Admin] Blog form data:", data);
       const res = await fetch("/api/blog", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
+      console.log("[Admin] Blog creation response status:", res.status);
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.error || "Create failed");
+        console.error("[Admin] Blog creation error:", error);
+        throw new Error(error.details ? JSON.stringify(error.details) : error.error || "Create failed");
       }
-      return res.json();
+      const result = await res.json();
+      console.log("[Admin] Blog created successfully:", result);
+      return result;
     },
     onSuccess: () => {
+      toast({ title: "✅ Blog post created!", description: "Your new blog post has been published successfully." });
       queryClient.invalidateQueries({ queryKey: ["/api/blog"] });
       setBlogForm({ title: "", excerpt: "", content: "", category: "", author: "", imageUrl: "" });
       setShowNewBlogModal(false);
     },
-    onError: (err) => setError(err.message),
+    onError: (err) => {
+      toast({ title: "❌ Blog creation failed", description: err.message, variant: "destructive" });
+      console.error("[Admin] Blog mutation error:", err);
+      setError(err.message);
+    },
   });
 
   // Delete mutations
@@ -282,7 +314,7 @@ export default function AdminDashboard() {
 
               <div className="grid gap-4">
                 {trails?.map((trail) => (
-                  <Card key={trail.id}>
+                  <Card key={trail._id?.toString() || trail.id}>
                     <CardContent className="pt-6">
                       <div className="flex justify-between items-start">
                         <div>
@@ -469,6 +501,18 @@ export default function AdminDashboard() {
                       <DialogTitle>Create New Blog Post</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4">
+                      {blogs && blogs.length > 0 && (
+                        <div className="bg-muted p-3 rounded-md">
+                          <p className="text-sm font-semibold mb-2">Existing Posts:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {blogs.map((post) => (
+                              <span key={post._id?.toString() || post.id} className="text-xs bg-background px-2 py-1 rounded border">
+                                {post.title}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       <Input
                         placeholder="Post title"
                         value={blogForm.title}
@@ -510,7 +554,7 @@ export default function AdminDashboard() {
 
               <div className="grid gap-4">
                 {blogs?.map((post) => (
-                  <Card key={post.id}>
+                  <Card key={post._id?.toString() || post.id}>
                     <CardContent className="pt-6">
                       <div className="flex justify-between items-start">
                         <div>
@@ -518,7 +562,7 @@ export default function AdminDashboard() {
                           <p className="text-sm text-muted-foreground line-clamp-2">{post.excerpt}</p>
                           <div className="flex gap-4 mt-2 text-sm">
                             <span>Category: {post.category}</span>
-                            <span>Author: {post.author}</span>
+                            <span>Author: {typeof post.author === "string" ? post.author : post.author?.username || "Anonymous"}</span>
                             <span>Published: {post.publishedAt}</span>
                           </div>
                         </div>
@@ -526,7 +570,7 @@ export default function AdminDashboard() {
                           <Button
                             variant="destructive"
                             size="sm"
-                            onClick={() => deleteBlogMutation.mutate(post.id)}
+                            onClick={() => deleteBlogMutation.mutate(post._id?.toString() || "")}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -546,7 +590,7 @@ export default function AdminDashboard() {
 
               <div className="grid gap-4">
                 {users?.map((u) => (
-                  <Card key={u.id}>
+                  <Card key={u._id?.toString() || u.id}>
                     <CardContent className="pt-6">
                       <div className="flex justify-between items-center">
                         <div>
@@ -586,7 +630,7 @@ export default function AdminDashboard() {
 
               <div className="grid gap-4">
                 {messages?.map((msg: any) => (
-                  <Card key={msg.id}>
+                  <Card key={msg._id?.toString() || msg.id}>
                     <CardContent className="pt-6">
                       <div>
                         <h3 className="font-semibold">{msg.subject}</h3>

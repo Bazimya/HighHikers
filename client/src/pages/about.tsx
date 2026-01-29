@@ -6,46 +6,46 @@ export default function About() {
   const values = [
     {
       icon: Mountain,
-      title: "Outdoor Adventure",
-      description: "We believe in the transformative power of nature and outdoor exploration.",
+      title: "Mental Wellness",
+      description: "Promoting emotional healing and mental well-being through nature-based experiences.",
     },
     {
       icon: Users,
       title: "Community First",
-      description: "Building connections between hikers and fostering a supportive community.",
+      description: "Building an inclusive, supportive space for youth to connect and grow together.",
     },
     {
       icon: Heart,
       title: "Environmental Care",
-      description: "Committed to preserving trails and protecting our natural environments.",
+      description: "Committed to environmental conservation and responsible tourism through Umuganda.",
     },
     {
       icon: Award,
-      title: "Safety & Education",
-      description: "Empowering hikers with knowledge and skills for safe outdoor experiences.",
+      title: "Youth Empowerment",
+      description: "Empowering youth physically, mentally, and socially through hiking and mentorship.",
     },
   ];
 
   const team = [
     {
-      name: "Sarah Johnson",
-      role: "Founder & Lead Guide",
-      bio: "15 years of hiking experience across 30+ national parks.",
+      name: "MPUHWE Dhurkifli",
+      role: "Founder & CEO",
+      bio: "Passionate about youth empowerment and nature-based healing through hiking experiences.",
     },
     {
-      name: "Mike Chen",
-      role: "Trail Coordinator",
-      bio: "Expert in trail maintenance and outdoor navigation.",
+      name: "Operations Team",
+      role: "Event Coordination",
+      bio: "Expert in organizing and coordinating weekly hikes across Rwanda's beautiful landscapes.",
     },
     {
-      name: "Emma Wilson",
-      role: "Community Manager",
-      bio: "Passionate about connecting hikers and building community.",
+      name: "Community Guides",
+      role: "Trail Leadership",
+      bio: "Trained guides dedicated to ensuring safe, inclusive, and transformative hiking experiences.",
     },
     {
-      name: "David Park",
-      role: "Safety Instructor",
-      bio: "Certified wilderness first responder and survival expert.",
+      name: "Youth Mentors",
+      role: "Peer Support",
+      bio: "Young leaders committed to peer counseling, skill-building, and community connection.",
     },
   ];
 
@@ -57,7 +57,7 @@ export default function About() {
             About HIGH HIKERS
           </h1>
           <p className="text-lg text-muted-foreground mb-8">
-            We're a community of outdoor enthusiasts dedicated to helping people discover the joy of hiking and connecting with nature.
+            A family of youth empowered through hiking, promoting physical, mental, and social wellness.
           </p>
         </div>
       </section>
@@ -67,20 +67,17 @@ export default function About() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
               <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-6">
-                Our Mission
+                Who We Are
               </h2>
               <div className="space-y-4 text-muted-foreground">
                 <p>
-                  Founded in 2020, HIGH HIKERS started with a simple goal: make hiking accessible and enjoyable for everyone, regardless of experience level.
+                  HIGH HIKERS is a family of youth led to use hiking as a tool to empower young people physically, mentally, and socially. Founded by MPUHWE Dhurkifli on 13th June, 2025.
                 </p>
                 <p>
-                  We believe that time spent in nature enriches our lives, strengthens our communities, and helps us appreciate the natural world around us.
+                  High Hikers was born out of a desire to create safe, inclusive and transformative outdoor experiences for youth.
                 </p>
                 <p>
-                  Through guided hikes, educational workshops, and our supportive community, we've helped thousands of people discover their love for the outdoors.
-                </p>
-                <p>
-                  Whether you're taking your first steps on a forest trail or summiting your tenth peak, we're here to support your journey.
+                  We organize regular hikes across Rwanda's hills and forests while integrating dialogue, peer support and skills building into experiences. Through this unique approach, we promote self-confidence, healing and a strong connection with nature.
                 </p>
               </div>
             </div>
@@ -170,20 +167,20 @@ export default function About() {
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-8">
             <div data-testid="stat-trails">
-              <div className="text-4xl font-bold text-primary font-mono">500+</div>
-              <div className="text-sm text-muted-foreground mt-1">Trails Mapped</div>
+              <div className="text-4xl font-bold text-primary font-mono">15+</div>
+              <div className="text-sm text-muted-foreground mt-1">Organized Hikes</div>
             </div>
             <div data-testid="stat-hikers">
-              <div className="text-4xl font-bold text-primary font-mono">10K+</div>
-              <div className="text-sm text-muted-foreground mt-1">Active Hikers</div>
+              <div className="text-4xl font-bold text-primary font-mono">100+</div>
+              <div className="text-sm text-muted-foreground mt-1">Youth Participants</div>
             </div>
             <div data-testid="stat-events">
-              <div className="text-4xl font-bold text-primary font-mono">200+</div>
-              <div className="text-sm text-muted-foreground mt-1">Events Yearly</div>
+              <div className="text-4xl font-bold text-primary font-mono">Weekly</div>
+              <div className="text-sm text-muted-foreground mt-1">Hikes Organized</div>
             </div>
             <div data-testid="stat-years">
-              <div className="text-4xl font-bold text-primary font-mono">5+</div>
-              <div className="text-sm text-muted-foreground mt-1">Years Running</div>
+              <div className="text-4xl font-bold text-primary font-mono">2025</div>
+              <div className="text-sm text-muted-foreground mt-1">Year Founded</div>
             </div>
           </div>
         </div>

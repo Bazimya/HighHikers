@@ -33,7 +33,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryKey: ["/api/auth/me"],
     queryFn: async () => {
       try {
-        const res = await fetch("/api/auth/me");
+        const res = await fetch("/api/auth/me", {
+          credentials: "include",
+        });
         if (res.ok) {
           return res.json();
         }
@@ -55,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     mutationFn: async (credentials: { username: string; password: string }) => {
       const res = await fetch("/api/auth/login", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(credentials),
       });
@@ -79,19 +82,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       firstName?: string;
       lastName?: string;
     }) => {
+      console.log("[AuthContext] Starting registration with data:", data);
       const res = await fetch("/api/auth/register", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
+      console.log("[AuthContext] Response status:", res.status);
 
       if (!res.ok) {
         const error = await res.json();
+        console.log("[AuthContext] Error response:", error);
         throw new Error(error.error || "Registration failed");
       }
 
-      return res.json();
+      const result = await res.json();
+      console.log("[AuthContext] Registration successful:", result);
+      return result;
     },
     onSuccess: (data) => {
       setUser(data);
@@ -103,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     mutationFn: async () => {
       const res = await fetch("/api/auth/logout", {
         method: "POST",
+        credentials: "include",
       });
 
       if (!res.ok) {
@@ -121,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     mutationFn: async (profileData: Partial<User>) => {
       const res = await fetch("/api/user/profile", {
         method: "PUT",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(profileData),
       });

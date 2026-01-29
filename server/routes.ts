@@ -327,10 +327,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await newEvent.save();
       res.status(201).json(newEvent);
     } catch (error) {
+      console.error("[Backend] Event creation error:", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Invalid event data", details: error.errors });
       }
-      res.status(500).json({ error: "Failed to create event" });
+      res.status(500).json({ error: "Failed to create event", details: error instanceof Error ? error.message : String(error) });
     }
   });
 
@@ -450,7 +451,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== BLOG ROUTES ====================
   app.get("/api/blog", async (req, res) => {
     try {
-      const posts = await BlogPost.find({ published: true }).sort({ createdAt: -1 }).populate("author", "username");
+      // If admin, return all posts; otherwise only published
+      const filter = req.user?.role === "admin" ? {} : { published: true };
+      const posts = await BlogPost.find(filter).sort({ createdAt: -1 }).populate("author", "username");
       res.json(posts);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch blog posts" });
@@ -499,8 +502,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       await newPost.save();
       res.status(201).json(newPost);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Blog creation error:", error);
+      
+      // Handle duplicate key error (E11000)
+      if (error.code === 11000) {
+        const field = Object.keys(error.keyPattern)[0];
+        return res.status(409).json({ 
+          error: `A blog post with this ${field} already exists. Please use a different title.` 
+        });
+      }
+      
       res.status(500).json({ error: "Failed to create blog post" });
     }
   });
@@ -555,6 +567,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(messages);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+
+  // ==================== NEWSLETTER ROUTES ====================
+  app.post("/api/newsletter/subscribe", async (req: AuthRequest, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email || !email.includes("@")) {
+        return res.status(400).json({ error: "Invalid email address" });
+      }
+
+      // For now, just store in a simple collection or log it
+      // In production, you'd integrate with a service like Mailchimp or SendGrid
+      console.log(`[Newsletter] New subscription: ${email}`);
+      
+      res.status(200).json({ 
+        message: "Successfully subscribed to newsletter",
+        email 
+      });
+    } catch (error) {
+      console.error("Newsletter subscription error:", error);
+      res.status(500).json({ error: "Failed to subscribe to newsletter" });
     }
   });
 

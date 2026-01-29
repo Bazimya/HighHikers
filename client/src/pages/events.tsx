@@ -148,7 +148,7 @@ export default function Events() {
         ) : isLoading ? (
           <div className="space-y-6">
             {[1, 2, 3, 4, 5].map((i) => (
-              <Card key={i}>
+              <Card key={`skeleton-event-${i}`}>
                 <div className="flex flex-col md:flex-row">
                   <div className="md:w-32 p-6">
                     <Skeleton className="h-20 w-20 mx-auto rounded-lg" />
@@ -171,8 +171,8 @@ export default function Events() {
             {events.map((event) => {
               const { day, month } = formatDate(event.date);
               return (
-                <Card key={event.id} className="hover-elevate transition-all" data-testid={`card-event-${event.id}`}>
-                <Link href={`/events/${event.id}`}>
+                <Card key={event._id?.toString() || event.id} className="hover-elevate transition-all" data-testid={`card-event-${event._id?.toString() || event.id}`}>
+                <Link href={`/events/${event._id?.toString() || event.id}`}>
                   <div className="flex flex-col md:flex-row">
                     <div className="md:w-32 bg-primary/10 flex flex-col items-center justify-center p-6 border-r border-card-border">
                       <Calendar className="h-8 w-8 text-primary mb-2" />
@@ -250,7 +250,7 @@ export default function Events() {
           <p className="text-muted-foreground mb-4">
             Want to organize your own event or suggest a new hike?
           </p>
-          <Button variant="outline" size="lg" data-testid="button-suggest-event">
+          <Button variant="outline" size="lg" data-testid="button-suggest-event" onClick={() => setShowNewEventModal(true)}>
             Suggest an Event
           </Button>
         </div>

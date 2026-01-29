@@ -68,8 +68,10 @@ export default function Blog() {
     return matchesSearch && matchesCategory;
   });
 
-  const getAuthorInitials = (name: string) => {
-    return name.split(" ").map(n => n[0]).join("").toUpperCase();
+  const getAuthorInitials = (author: any) => {
+    const name = typeof author === "string" ? author : author?.username;
+    const firstName = name?.split?.(" ")?.[0] ?? "G";
+    return firstName[0]?.toUpperCase() ?? "A";
   };
 
   return (
@@ -172,15 +174,15 @@ export default function Blog() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredPosts.map((post) => (
-              <Card key={post.id} className="overflow-hidden hover-elevate transition-all flex flex-col" data-testid={`card-post-${post.id}`}>
-                <Link href={`/blog/${post.id}`}>
+              <Card key={post._id?.toString() || post.id} className="overflow-hidden hover-elevate transition-all flex flex-col" data-testid={`card-post-${post._id?.toString() || post.id}`}>
+                <Link href={`/blog/${post._id?.toString() || post.id}`}>
                 <div className="relative aspect-video overflow-hidden">
                   <img
                     src={imageMap[post.imageUrl] || forestTrail}
                     alt={post.title}
                     className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                   />
-                  <Badge className="absolute top-3 left-3 bg-primary text-primary-foreground" data-testid={`badge-category-${post.id}`}>
+                  <Badge className="absolute top-3 left-3 bg-primary text-primary-foreground" data-testid={`badge-category-${post._id?.toString() || post.id}`}>
                     {post.category}
                   </Badge>
                 </div>
@@ -202,7 +204,9 @@ export default function Blog() {
                         </AvatarFallback>
                       </Avatar>
                       <div className="text-sm">
-                        <div className="text-foreground font-medium">{post.author}</div>
+                        <div className="text-foreground font-medium">
+                          {typeof post.author === "string" ? post.author : post.author?.username || "Anonymous"}
+                        </div>
                       </div>
                     </div>
                   </div>

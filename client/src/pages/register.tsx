@@ -30,21 +30,28 @@ export default function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("[Register] Form submitted");
     setError("");
+
+    console.log("[Register] Form data:", formData);
 
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords don't match");
+      console.log("[Register] Error: Passwords don't match");
       return;
     }
 
     if (formData.password.length < 8) {
       setError("Password must be at least 8 characters");
+      console.log("[Register] Error: Password too short");
       return;
     }
 
     setIsLoading(true);
+    console.log("[Register] Calling register function");
 
     try {
+      console.log("[Register] About to send to backend");
       await register(
         formData.username,
         formData.email,
@@ -52,9 +59,12 @@ export default function Register() {
         formData.firstName,
         formData.lastName
       );
+      console.log("[Register] Registration successful");
       setLocation("/");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed");
+      const errorMsg = err instanceof Error ? err.message : "Registration failed";
+      console.log("[Register] Error caught:", errorMsg);
+      setError(errorMsg);
     } finally {
       setIsLoading(false);
     }

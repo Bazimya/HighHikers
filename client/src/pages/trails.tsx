@@ -197,7 +197,7 @@ export default function Trails() {
         ) : isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Card key={i} className="overflow-hidden">
+              <Card key={`skeleton-trail-${i}`} className="overflow-hidden">
                 <Skeleton className="aspect-video w-full" />
                 <CardHeader>
                   <Skeleton className="h-6 w-3/4 mb-2" />
@@ -227,8 +227,8 @@ export default function Trails() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredTrails.map((trail) => (
-              <Card key={trail.id} className="overflow-hidden hover-elevate transition-all cursor-pointer h-full" data-testid={`card-trail-${trail.id}`}>
-                <Link href={`/trails/${trail.id}`}>
+              <Card key={trail._id?.toString() || trail.id} className="overflow-hidden hover-elevate transition-all cursor-pointer h-full" data-testid={`card-trail-${trail._id?.toString() || trail.id}`}>
+                <Link href={`/trails/${trail._id?.toString() || trail.id}`}>
                 <div className="relative aspect-video overflow-hidden">
                   <img
                     src={imageMap[trail.imageUrl] || forestTrail}
