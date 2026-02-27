@@ -146,22 +146,22 @@ export default function Trails() {
               All Trails
             </Button>
             <Button
-              variant={selectedDifficulty === "Easy" ? "default" : "outline"}
-              onClick={() => setSelectedDifficulty("Easy")}
+              variant={selectedDifficulty === "easy" ? "default" : "outline"}
+              onClick={() => setSelectedDifficulty("easy")}
               data-testid="button-filter-easy"
             >
               Easy
             </Button>
             <Button
-              variant={selectedDifficulty === "Moderate" ? "default" : "outline"}
-              onClick={() => setSelectedDifficulty("Moderate")}
+              variant={selectedDifficulty === "moderate" ? "default" : "outline"}
+              onClick={() => setSelectedDifficulty("moderate")}
               data-testid="button-filter-moderate"
             >
               Moderate
             </Button>
             <Button
-              variant={selectedDifficulty === "Hard" ? "default" : "outline"}
-              onClick={() => setSelectedDifficulty("Hard")}
+              variant={selectedDifficulty === "hard" ? "default" : "outline"}
+              onClick={() => setSelectedDifficulty("hard")}
               data-testid="button-filter-hard"
             >
               Hard

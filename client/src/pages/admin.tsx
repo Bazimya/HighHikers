@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AlertCircle, Plus, Edit2, Trash2, Users, Mountain, Calendar, FileText } from "lucide-react";
+import { AlertCircle, Plus, Edit2, Trash2, Users, Mountain, Calendar, FileText, CheckCircle, XCircle } from "lucide-react";
 import type { TrailType, EventType, BlogPostType, UserType } from "@shared/schema";
 
 export default function AdminDashboard() {
@@ -23,11 +23,13 @@ export default function AdminDashboard() {
   const [showNewTrailModal, setShowNewTrailModal] = useState(false);
   const [showNewEventModal, setShowNewEventModal] = useState(false);
   const [showNewBlogModal, setShowNewBlogModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState<string | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
   
   // Form states
   const [trailForm, setTrailForm] = useState({ name: "", location: "", difficulty: "medium", distance: "", elevation: "", duration: "", description: "", imageUrl: "" });
   const [eventForm, setEventForm] = useState({ title: "", location: "", difficulty: "medium", date: "", time: "", maxParticipants: "", description: "", imageUrl: "", isPaid: false, price: "", currency: "RWF" });
-  const [blogForm, setBlogForm] = useState({ title: "", excerpt: "", content: "", category: "", author: "", imageUrl: "" });
+  const [blogForm, setBlogForm] = useState({ title: "", excerpt: "", content: "", category: "", author: "", imageUrl: "", published: true });
 
   // Redirect if not admin
   if (!user?.role || user.role !== "admin") {
@@ -51,8 +53,12 @@ export default function AdminDashboard() {
     queryKey: ["/api/admin/users"],
   });
 
-  const { data: messages } = useQuery({
+  const { data: messages = [] } = useQuery<any[]>({
     queryKey: ["/api/contact/messages"],
+  });
+
+  const { data: eventSuggestions = [] } = useQuery<any[]>({
+    queryKey: ["/api/admin/event-suggestions"],
   });
 
   // Create mutations
@@ -144,7 +150,7 @@ export default function AdminDashboard() {
     onSuccess: () => {
       toast({ title: "✅ Blog post created!", description: "Your new blog post has been published successfully." });
       queryClient.invalidateQueries({ queryKey: ["/api/blog"] });
-      setBlogForm({ title: "", excerpt: "", content: "", category: "", author: "", imageUrl: "" });
+      setBlogForm({ title: "", excerpt: "", content: "", category: "", author: "", imageUrl: "", published: true });
       setShowNewBlogModal(false);
     },
     onError: (err) => {
@@ -204,6 +210,66 @@ export default function AdminDashboard() {
     },
   });
 
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Delete failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "✅ User deleted", description: "The user account has been removed." });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+    },
+    onError: (err) => {
+      toast({ title: "❌ Delete failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const approveSuggestionMutation = useMutation({
+    mutationFn: async (suggestionId: string) => {
+      const res = await fetch(`/api/admin/event-suggestions/${suggestionId}/approve`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) throw new Error("Approval failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "✅ Event approved!", description: "The event has been created successfully." });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/event-suggestions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
+    },
+    onError: (err) => {
+      toast({ title: "❌ Approval failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const rejectSuggestionMutation = useMutation({
+    mutationFn: async ({ suggestionId, reason }: { suggestionId: string; reason: string }) => {
+      const res = await fetch(`/api/admin/event-suggestions/${suggestionId}/reject`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      if (!res.ok) throw new Error("Rejection failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "✅ Event rejected", description: "The suggestion has been rejected." });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/event-suggestions"] });
+      setShowRejectModal(null);
+      setRejectionReason("");
+    },
+    onError: (err) => {
+      toast({ title: "❌ Rejection failed", description: err.message, variant: "destructive" });
+    },
+  });
+
   return (
     <div className="min-h-screen py-12 bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -220,7 +286,7 @@ export default function AdminDashboard() {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="trails">
               <Mountain className="h-4 w-4 mr-2" />
               Trails
@@ -228,6 +294,10 @@ export default function AdminDashboard() {
             <TabsTrigger value="events">
               <Calendar className="h-4 w-4 mr-2" />
               Events
+            </TabsTrigger>
+            <TabsTrigger value="suggestions">
+              <Calendar className="h-4 w-4 mr-2" />
+              Suggestions
             </TabsTrigger>
             <TabsTrigger value="blog">
               <FileText className="h-4 w-4 mr-2" />
@@ -484,6 +554,113 @@ export default function AdminDashboard() {
             </div>
           </TabsContent>
 
+          {/* SUGGESTIONS TAB */}
+          <TabsContent value="suggestions">
+            <div className="space-y-4">
+              <h2 className="text-2xl font-bold">Event Suggestions</h2>
+
+              {eventSuggestions && eventSuggestions.length === 0 ? (
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-center text-muted-foreground">No pending suggestions</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-4">
+                  {eventSuggestions?.map((suggestion: any) => (
+                    <Card key={suggestion._id?.toString()}>
+                      <CardContent className="pt-6">
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-lg">{suggestion.title}</h3>
+                              <p className="text-sm text-muted-foreground">
+                                Suggested by: {suggestion.userId?.username || "Unknown"} ({suggestion.userId?.email})
+                              </p>
+                              <div className="flex gap-4 mt-2 text-sm">
+                                <span>Location: {suggestion.location}</span>
+                                <span>Date: {suggestion.date}</span>
+                                <span>Difficulty: {suggestion.difficulty}</span>
+                              </div>
+                            </div>
+                            <span className="inline-block px-2 py-1 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-100 text-xs rounded">
+                              {suggestion.status || "pending"}
+                            </span>
+                          </div>
+
+                          <div className="bg-muted p-3 rounded">
+                            <p className="text-sm"><strong>Description:</strong> {suggestion.description}</p>
+                          </div>
+
+                          {suggestion.time && (
+                            <p className="text-sm"><strong>Time:</strong> {suggestion.time}</p>
+                          )}
+                          {suggestion.maxParticipants && (
+                            <p className="text-sm"><strong>Max Participants:</strong> {suggestion.maxParticipants}</p>
+                          )}
+
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              className="gap-2"
+                              onClick={() => approveSuggestionMutation.mutate(suggestion._id?.toString())}
+                              disabled={approveSuggestionMutation.isPending}
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                              Approve
+                            </Button>
+                            <Dialog open={showRejectModal === suggestion._id?.toString()} onOpenChange={(open) => {
+                              if (!open) {
+                                setShowRejectModal(null);
+                                setRejectionReason("");
+                              } else {
+                                setShowRejectModal(suggestion._id?.toString());
+                              }
+                            }}>
+                              <DialogTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="gap-2"
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                  Reject
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Reject Event Suggestion</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                  <Textarea
+                                    placeholder="Reason for rejection (optional)"
+                                    value={rejectionReason}
+                                    onChange={(e) => setRejectionReason(e.target.value)}
+                                  />
+                                  <Button
+                                    onClick={() =>
+                                      rejectSuggestionMutation.mutate({
+                                        suggestionId: suggestion._id?.toString(),
+                                        reason: rejectionReason,
+                                      })
+                                    }
+                                    disabled={rejectSuggestionMutation.isPending}
+                                  >
+                                    {rejectSuggestionMutation.isPending ? "Rejecting..." : "Confirm Rejection"}
+                                  </Button>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
           {/* BLOG TAB */}
           <TabsContent value="blog">
             <div className="space-y-4">
@@ -544,6 +721,18 @@ export default function AdminDashboard() {
                         value={blogForm.imageUrl}
                         onChange={(e) => setBlogForm({ ...blogForm, imageUrl: e.target.value })}
                       />
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="published"
+                          checked={blogForm.published}
+                          onChange={(e) => setBlogForm({ ...blogForm, published: e.target.checked })}
+                          className="h-4 w-4"
+                        />
+                        <label htmlFor="published" className="text-sm font-medium">
+                          Publish immediately (visible to users)
+                        </label>
+                      </div>
                       <Button onClick={() => createBlogMutation.mutate(blogForm)} disabled={createBlogMutation.isPending}>
                         {createBlogMutation.isPending ? "Creating..." : "Create Post"}
                       </Button>
@@ -562,8 +751,8 @@ export default function AdminDashboard() {
                           <p className="text-sm text-muted-foreground line-clamp-2">{post.excerpt}</p>
                           <div className="flex gap-4 mt-2 text-sm">
                             <span>Category: {post.category}</span>
-                            <span>Author: {typeof post.author === "string" ? post.author : post.author?.username || "Anonymous"}</span>
-                            <span>Published: {post.publishedAt}</span>
+                            <span>Author: {typeof post.author === "string" ? post.author : (post.author as any)?.username || "Anonymous"}</span>
+                            <span>Published: {post.published ? "Yes" : "No"}</span>
                           </div>
                         </div>
                         <div className="flex gap-2">
@@ -602,7 +791,7 @@ export default function AdminDashboard() {
                             {u.role}
                           </span>
                         </div>
-                        <div>
+                        <div className="flex gap-2 items-center">
                           <select
                             aria-label="User role"
                             value={u.role || "user"}
@@ -614,6 +803,18 @@ export default function AdminDashboard() {
                             <option value="user">User</option>
                             <option value="admin">Admin</option>
                           </select>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => {
+                              if (confirm(`Are you sure you want to delete ${u.username}? This action cannot be undone.`)) {
+                                deleteUserMutation.mutate(u.id);
+                              }
+                            }}
+                            disabled={deleteUserMutation.isPending}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     </CardContent>

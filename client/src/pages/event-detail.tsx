@@ -75,13 +75,20 @@ export default function EventDetail() {
 
   const submitReviewMutation = useMutation({
     mutationFn: async () => {
+      if (!rating || !reviewText || reviewText.length < 10) {
+        throw new Error("Review must be at least 10 characters and have a rating");
+      }
+      
       const res = await fetch(`/api/events/${id}/reviews`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rating, reviewText }),
       });
-      if (!res.ok) throw new Error("Review submission failed");
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Review submission failed");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -89,6 +96,13 @@ export default function EventDetail() {
       setRating(0);
       setReviewText("");
       queryClient.invalidateQueries({ queryKey: [`/api/events/${id}/reviews`] });
+    },
+    onError: (error) => {
+      toast({ 
+        title: "Error", 
+        description: error instanceof Error ? error.message : "Failed to post review", 
+        variant: "destructive" 
+      });
     },
   });
 
@@ -317,10 +331,13 @@ export default function EventDetail() {
                       onChange={(e) => setReviewText(e.target.value)}
                       rows={4}
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Minimum 10 characters ({reviewText.length}/10)
+                    </p>
                   </div>
                   <Button
                     onClick={() => submitReviewMutation.mutate()}
-                    disabled={submitReviewMutation.isPending || !rating || !reviewText}
+                    disabled={submitReviewMutation.isPending || !rating || reviewText.length < 10}
                   >
                     {submitReviewMutation.isPending ? "Posting..." : "Post Review"}
                   </Button>

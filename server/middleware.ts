@@ -4,22 +4,25 @@ import { findUserById } from "./auth";
 
 declare global {
   namespace Express {
-    interface Session {
-      userId?: string;
+    interface Request {
+      user?: {
+        _id: mongoose.Types.ObjectId;
+        id?: string;
+        username: string;
+        email: string;
+        role: string;
+      };
     }
   }
 }
 
-export interface AuthRequest extends Request {
-  user?: {
-    _id: mongoose.Types.ObjectId;
-    id?: string;
-    username: string;
-    email: string;
-    role: string;
-  };
-  session?: any;
+declare module "express-session" {
+  interface SessionData {
+    userId?: string;
+  }
 }
+
+export type AuthRequest = Request;
 
 export async function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
   if (!req.user) {

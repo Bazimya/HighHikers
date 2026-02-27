@@ -12,6 +12,7 @@ export interface IUser extends Document {
   avatar?: string;
   bio?: string;
   role: 'user' | 'admin';
+  emailVerified: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -26,11 +27,37 @@ const userSchema = new Schema<IUser>(
     avatar: String,
     bio: String,
     role: { type: String, enum: ['user', 'admin'], default: 'user' },
+    emailVerified: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
 
 export const User = mongoose.model<IUser>('User', userSchema);
+
+// OTP Schema
+export interface IOTP extends Document {
+  _id: mongoose.Types.ObjectId;
+  email: string;
+  code: string;
+  expiresAt: Date;
+  attempts: number;
+  createdAt: Date;
+}
+
+const otpSchema = new Schema<IOTP>(
+  {
+    email: { type: String, required: true },
+    code: { type: String, required: true },
+    expiresAt: { type: Date, required: true },
+    attempts: { type: Number, default: 0 },
+  },
+  { timestamps: true }
+);
+
+// Auto-delete expired OTPs
+otpSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+export const OTP = mongoose.model<IOTP>('OTP', otpSchema);
 
 // Trail Schema
 export interface ITrail extends Document {
@@ -44,6 +71,16 @@ export interface ITrail extends Document {
   location: string;
   latitude?: number;
   longitude?: number;
+  startPoint?: {
+    latitude: number;
+    longitude: number;
+    name?: string;
+  };
+  endPoint?: {
+    latitude: number;
+    longitude: number;
+    name?: string;
+  };
   imageUrl: string;
   images?: Array<{ url: string; caption?: string }>;
   featured?: boolean;
@@ -64,6 +101,16 @@ const trailSchema = new Schema<ITrail>(
     location: { type: String, required: true },
     latitude: Number,
     longitude: Number,
+    startPoint: {
+      latitude: Number,
+      longitude: Number,
+      name: String,
+    },
+    endPoint: {
+      latitude: Number,
+      longitude: Number,
+      name: String,
+    },
     imageUrl: { type: String, required: true },
     images: [{ url: String, caption: String }],
     featured: { type: Boolean, default: false },
@@ -95,6 +142,11 @@ export interface IEvent extends Document {
   isPaid?: boolean;
   price?: number;
   currency?: string;
+  startPoint?: {
+    latitude: number;
+    longitude: number;
+    name?: string;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -113,6 +165,11 @@ const eventSchema = new Schema<IEvent>(
     currentParticipants: { type: Number, default: 0 },
     imageUrl: { type: String, required: true },
     featured: { type: Boolean, default: false },
+    startPoint: {
+      latitude: Number,
+      longitude: Number,
+      name: String,
+    },
     averageRating: { type: Number, default: 0 },
     reviewCount: { type: Number, default: 0 },
     isPaid: { type: Boolean, default: false },
@@ -159,6 +216,26 @@ const blogPostSchema = new Schema<IBlogPost>(
 
 export const BlogPost = mongoose.model<IBlogPost>('BlogPost', blogPostSchema);
 
+// Trail Registration Schema
+export interface ITrailRegistration extends Document {
+  _id: mongoose.Types.ObjectId;
+  userId: mongoose.Types.ObjectId;
+  trailId: mongoose.Types.ObjectId;
+  status: 'registered' | 'cancelled';
+  registeredAt: Date;
+}
+
+const trailRegistrationSchema = new Schema<ITrailRegistration>(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    trailId: { type: Schema.Types.ObjectId, ref: 'Trail', required: true },
+    status: { type: String, enum: ['registered', 'cancelled'], default: 'registered' },
+    registeredAt: { type: Date, default: Date.now },
+  }
+);
+
+export const TrailRegistrationModel = mongoose.model<ITrailRegistration>('TrailRegistration', trailRegistrationSchema);
+
 // Event Registration Schema
 export interface IEventRegistration extends Document {
   _id: mongoose.Types.ObjectId;
@@ -180,6 +257,49 @@ const eventRegistrationSchema = new Schema<IEventRegistration>(
 );
 
 export const EventRegistration = mongoose.model<IEventRegistration>('EventRegistration', eventRegistrationSchema);
+
+// Event Suggestion Schema
+export interface IEventSuggestion extends Document {
+  _id: mongoose.Types.ObjectId;
+  userId: mongoose.Types.ObjectId;
+  title: string;
+  location: string;
+  difficulty: string;
+  date: string;
+  time: string;
+  maxParticipants?: number;
+  description: string;
+  imageUrl?: string;
+  isPaid: boolean;
+  price?: number;
+  currency?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  rejectionReason?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const eventSuggestionSchema = new Schema<IEventSuggestion>(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    title: { type: String, required: true },
+    location: { type: String, required: true },
+    difficulty: { type: String, required: true },
+    date: { type: String, required: true },
+    time: { type: String, required: true },
+    maxParticipants: Number,
+    description: { type: String, required: true },
+    imageUrl: String,
+    isPaid: { type: Boolean, default: false },
+    price: Number,
+    currency: { type: String, default: 'RWF' },
+    status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+    rejectionReason: String,
+  },
+  { timestamps: true }
+);
+
+export const EventSuggestion = mongoose.model<IEventSuggestion>('EventSuggestion', eventSuggestionSchema);
 
 // Payment Schema
 export interface IPayment extends Document {
@@ -237,6 +357,29 @@ const trailReviewSchema = new Schema<ITrailReview>(
 );
 
 export const TrailReview = mongoose.model<ITrailReview>('TrailReview', trailReviewSchema);
+
+// Event Review Schema
+export interface IEventReview extends Document {
+  _id: mongoose.Types.ObjectId;
+  userId: mongoose.Types.ObjectId;
+  eventId: mongoose.Types.ObjectId;
+  rating: number;
+  reviewText: string;
+  createdAt: Date;
+}
+
+const eventReviewSchema = new Schema<IEventReview>(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    eventId: { type: Schema.Types.ObjectId, ref: 'Event', required: true },
+    rating: { type: Number, required: true, min: 1, max: 5 },
+    reviewText: { type: String, required: true },
+  },
+  { timestamps: true }
+);
+
+export const EventReview = mongoose.model<IEventReview>('EventReview', eventReviewSchema);
+
 
 // Photo Gallery Schema
 export interface IPhotoGallery extends Document {
@@ -306,6 +449,27 @@ const contactMessageSchema = new Schema<IContactMessage>(
 
 export const ContactMessage = mongoose.model<IContactMessage>('ContactMessage', contactMessageSchema);
 
+// Newsletter Subscription Schema
+export interface INewsletter extends Document {
+  _id: mongoose.Types.ObjectId;
+  email: string;
+  subscribed: boolean;
+  subscribedAt: Date;
+  unsubscribedAt?: Date;
+}
+
+const newsletterSchema = new Schema<INewsletter>(
+  {
+    email: { type: String, required: true, unique: true, lowercase: true },
+    subscribed: { type: Boolean, default: true },
+    subscribedAt: { type: Date, default: Date.now },
+    unsubscribedAt: Date,
+  },
+  { timestamps: true }
+);
+
+export const Newsletter = mongoose.model<INewsletter>('Newsletter', newsletterSchema);
+
 // Zod validation schemas
 export const userRegisterSchema = z.object({
   username: z.string().min(3).max(30),
@@ -360,7 +524,7 @@ export type Event = IEvent; // Legacy alias
 export type BlogPostType = IBlogPost;
 export type BlogPost = IBlogPost; // Legacy alias
 export type TrailReviewType = ITrailReview;
-export type TrailRegistration = IEventRegistration;
+export type TrailRegistration = ITrailRegistration;
 export type EventRegistration = IEventRegistration;
 
 // Contact Message export

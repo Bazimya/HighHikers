@@ -20,6 +20,7 @@ interface AuthContextType {
   register: (username: string, email: string, password: string, firstName?: string, lastName?: string) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
+  reloadUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -147,6 +148,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  const reloadUserFn = async () => {
+    try {
+      const res = await fetch("/api/auth/me", {
+        credentials: "include",
+      });
+      if (res.ok) {
+        const userData = await res.json();
+        setUser(userData);
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      }
+    } catch (error) {
+      console.error("Failed to reload user:", error);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -158,6 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           registerMutation.mutateAsync({ username, email, password, firstName, lastName }),
         logout: () => logoutMutation.mutateAsync(),
         updateProfile: (data) => updateProfileMutation.mutateAsync(data),
+        reloadUser: reloadUserFn,
       }}
     >
       {children}

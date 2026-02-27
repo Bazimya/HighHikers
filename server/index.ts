@@ -1,18 +1,80 @@
+import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
+import MongoStore from "connect-mongo";
 import { connectDB } from "./db";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+
+// ============== ENVIRONMENT VALIDATION ==============
+function validateEnvironment() {
+  const required = [
+    'MONGODB_URI',
+    'SESSION_SECRET',
+    'STRIPE_SECRET_KEY',
+    'NODE_ENV',
+  ];
+  
+  const productionRequired = [
+    'FRONTEND_URL',
+    'EMAIL_USER',
+    'EMAIL_PASSWORD',
+  ];
+  
+  const missing: string[] = [];
+  
+  required.forEach(key => {
+    if (!process.env[key]) {
+      missing.push(key);
+    }
+  });
+  
+  if (process.env.NODE_ENV === 'production') {
+    productionRequired.forEach(key => {
+      if (!process.env[key]) {
+        missing.push(key);
+      }
+    });
+  }
+  
+  if (missing.length > 0) {
+    console.error('❌ CRITICAL: Missing environment variables:', missing);
+    console.error('Please set these variables in your .env file');
+    process.exit(1);
+  }
+  
+  console.log('✅ All required environment variables verified');
+}
+
+// Call validation at startup
+validateEnvironment();
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// CORS middleware to allow credentials
+// ============== CORS MIDDLEWARE - Production Safe ==============
+const getAllowedOrigins = () => {
+  if (process.env.NODE_ENV === "production") {
+    return process.env.FRONTEND_URL || "https://yourdomain.com";
+  }
+  return ["http://localhost:5173", "http://localhost:5000"];
+};
+
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "http://localhost:5173");
+  const origin = req.headers.origin;
+  const allowedOrigins = getAllowedOrigins();
+  
+  if (Array.isArray(allowedOrigins)) {
+    if (allowedOrigins.includes(origin || "")) {
+      res.header("Access-Control-Allow-Origin", origin);
+    }
+  } else if (origin === allowedOrigins) {
+    res.header("Access-Control-Allow-Origin", origin);
+  }
+  
   res.header("Access-Control-Allow-Credentials", "true");
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
   
   if (req.method === "OPTIONS") {
@@ -22,29 +84,24 @@ app.use((req, res, next) => {
   next();
 });
 
-// Session middleware
+// ============== SESSION MIDDLEWARE - Production Ready ==============
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "dev-secret-key",
     resave: false,
     saveUninitialized: false,
+    store: new MongoStore({
+      mongoUrl: process.env.MONGODB_URI || "mongodb://localhost:27017/high-hikers",
+      touchAfter: 24 * 3600, // lazy session update (in seconds)
+    }),
     cookie: {
       secure: process.env.NODE_ENV === "production",
       httpOnly: true,
       maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
-      sameSite: "lax",
+      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
     },
   })
 );
-
-// Extend session interface
-declare global {
-  namespace Express {
-    interface Session {
-      userId?: string;
-    }
-  }
-}
 
 app.use((req, res, next) => {
   const start = Date.now();

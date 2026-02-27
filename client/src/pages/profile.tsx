@@ -207,7 +207,7 @@ export default function Profile() {
                     {trailRegistrations?.map((reg) => (
                       <div key={reg.id} className="flex items-center justify-between p-4 border rounded-lg">
                         <div>
-                          <h3 className="font-semibold">Trail ID: {reg.trailId.slice(0, 8)}</h3>
+                          <h3 className="font-semibold">Trail ID: {(reg.trailId as any)?.toString()?.slice(0, 8)}</h3>
                           <p className="text-sm text-muted-foreground">
                             Registered: {new Date(reg.registeredAt!).toLocaleDateString()}
                           </p>
@@ -237,7 +237,7 @@ export default function Profile() {
                     {eventRegistrations?.map((reg) => (
                       <div key={reg.id} className="flex items-center justify-between p-4 border rounded-lg">
                         <div>
-                          <h3 className="font-semibold">Event ID: {reg.eventId.slice(0, 8)}</h3>
+                          <h3 className="font-semibold">Event ID: {(reg.eventId as any)?.toString()?.slice(0, 8)}</h3>
                           <p className="text-sm text-muted-foreground">
                             Registered: {new Date(reg.registeredAt!).toLocaleDateString()}
                           </p>

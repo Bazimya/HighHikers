@@ -10,10 +10,14 @@ import {
   BlogPost,
   ContactMessage,
   TrailReview,
+  EventReview,
   EventRegistration,
+  EventSuggestion,
   PhotoGallery,
   ActivityLog,
   Payment,
+  Newsletter,
+  OTP,
   userRegisterSchema,
   trailCreateSchema,
   eventCreateSchema,
@@ -21,11 +25,12 @@ import {
 } from "@shared/schema";
 import { AuthRequest, requireAuth, requireAdmin, optionalAuth } from "./middleware";
 import { findUserByUsername, findUserByEmail, createUser, verifyPassword, hashPassword, findUserById } from "./auth";
+import { sendEmail, getTrailNotificationEmail, getEventNotificationEmail, getBlogNotificationEmail, getEventSuggestionApprovedEmail, getEventSuggestionRejectedEmail, getOTPEmail } from "./email-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize Stripe
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-    apiVersion: "2024-12-18",
+    apiVersion: "2023-10-16",
   });
 
   // Apply optional auth middleware to all routes
@@ -65,16 +70,149 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastName: data.lastName,
       });
 
-      req.session!.userId = newUser.id.toString();
+      // Send OTP for email verification
+      try {
+        const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // Expires in 10 minutes
+
+        await OTP.create({
+          email: data.email,
+          code: otp,
+          expiresAt,
+        });
+
+        console.log(`[Registration] 🔐 OTP Code for ${data.email}: ${otp}`); // Show in dev mode
+
+        const emailContent = getOTPEmail(otp);
+        await sendEmail({
+          to: data.email,
+          subject: emailContent.subject,
+          html: emailContent.html,
+          text: emailContent.text,
+        });
+
+        console.log(`[Registration] ✅ OTP sent to ${data.email}`);
+      } catch (emailError) {
+        console.error("[Registration] ⚠️  Failed to send OTP:", emailError instanceof Error ? emailError.message : emailError);
+        // Don't fail registration if email fails
+      }
 
       return res.status(201).json({
         id: newUser.id,
         username: newUser.username,
         email: newUser.email,
+        message: "Account created! Please check your email for verification code.",
       });
     } catch (error) {
       console.error("Registration error:", error);
       return res.status(500).json({ error: "Registration failed" });
+    }
+  });
+
+  app.post("/api/auth/send-otp", async (req: AuthRequest, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+
+      const user = await findUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      if (user.emailVerified) {
+        return res.status(400).json({ error: "Email already verified" });
+      }
+
+      // Generate OTP
+      const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // Expires in 10 minutes
+
+      // Delete any existing OTPs for this email
+      await OTP.deleteMany({ email });
+
+      // Create new OTP
+      await OTP.create({
+        email,
+        code: otp,
+        expiresAt,
+      });
+
+      // Send OTP email
+      try {
+        const emailContent = getOTPEmail(otp);
+        await sendEmail({
+          to: email,
+          subject: emailContent.subject,
+          html: emailContent.html,
+          text: emailContent.text,
+        });
+
+        console.log(`[Email] ✅ OTP sent to ${email}`);
+      } catch (emailError) {
+        console.error("[Email] ⚠️  Failed to send OTP email:", emailError instanceof Error ? emailError.message : emailError);
+        // Still succeed - OTP is created, user can verify with email or we're in dev mode
+      }
+
+      return res.json({ message: "OTP sent to your email. Check spam folder if not received." });
+    } catch (error) {
+      console.error("Send OTP error:", error instanceof Error ? error.message : error);
+      return res.status(500).json({ error: "Failed to create OTP" });
+    }
+  });
+
+  app.post("/api/auth/verify-otp", async (req: AuthRequest, res) => {
+    try {
+      const { email, code } = req.body;
+
+      if (!email || !code) {
+        return res.status(400).json({ error: "Email and code are required" });
+      }
+
+      const user = await findUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      if (user.emailVerified) {
+        req.session!.userId = user._id.toString();
+        return res.json({ message: "Email already verified", user: { id: user._id, username: user.username, email: user.email } });
+      }
+
+      // Find valid OTP
+      const otp = await OTP.findOne({
+        email,
+        code,
+        expiresAt: { $gt: new Date() },
+      });
+
+      if (!otp) {
+        return res.status(400).json({ error: "Invalid or expired OTP" });
+      }
+
+      // Mark email as verified
+      user.emailVerified = true;
+      await user.save();
+
+      // Delete used OTP
+      await OTP.deleteOne({ _id: otp._id });
+
+      // Auto-login user
+      req.session!.userId = user._id.toString();
+
+      return res.json({
+        message: "Email verified successfully!",
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+        },
+      });
+    } catch (error) {
+      console.error("Verify OTP error:", error);
+      return res.status(500).json({ error: "Failed to verify OTP" });
     }
   });
 
@@ -111,7 +249,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/auth/logout", (req: AuthRequest, res) => {
-    req.session!.destroy((err) => {
+    req.session?.destroy((err: any) => {
       if (err) {
         return res.status(500).json({ error: "Logout failed" });
       }
@@ -165,6 +303,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = trailCreateSchema.parse(req.body);
       const newTrail = new Trail(validatedData);
       await newTrail.save();
+      
+      // Notify newsletter subscribers
+      (async () => {
+        try {
+          const subscribers = await Newsletter.find({ subscribed: true });
+          if (subscribers.length > 0) {
+            const emails = subscribers.map(s => s.email);
+            const emailTemplate = getTrailNotificationEmail(
+              newTrail.name,
+              newTrail.description,
+              `${process.env.FRONTEND_URL || 'http://localhost:5173'}/trails/${newTrail._id}`
+            );
+            
+            await sendEmail({
+              to: emails,
+              subject: emailTemplate.subject,
+              html: emailTemplate.html,
+              text: emailTemplate.text,
+            });
+            
+            console.log(`[Newsletter] Sent trail notification to ${emails.length} subscribers`);
+          }
+        } catch (emailError) {
+          console.error('[Newsletter] Failed to send trail notification:', emailError);
+        }
+      })();
+      
       res.status(201).json(newTrail);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -218,7 +383,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid trail ID" });
       }
 
-      const validatedData = reviewCreateSchema.parse(req.body);
+      // Validate data
+      try {
+        var validatedData = reviewCreateSchema.parse(req.body);
+      } catch (validationError) {
+        if (validationError instanceof z.ZodError) {
+          const errorMessages = validationError.errors
+            .map(e => {
+              if (e.code === 'too_small') {
+                return `${e.path[0]} must be at least ${e.minimum} characters`;
+              }
+              return `${e.path[0]}: ${e.message}`;
+            })
+            .join(", ");
+          return res.status(400).json({ error: "Invalid review data: " + errorMessages });
+        }
+        throw validationError;
+      }
       
       const review = new TrailReview({
         ...validatedData,
@@ -238,9 +419,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.status(201).json(review);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: "Invalid review data", details: error.errors });
-      }
+      console.error("Review creation error:", error);
       res.status(500).json({ error: "Failed to create review" });
     }
   });
@@ -325,6 +504,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = eventCreateSchema.parse(req.body);
       const newEvent = new Event(validatedData);
       await newEvent.save();
+      
+      // Notify newsletter subscribers
+      (async () => {
+        try {
+          const subscribers = await Newsletter.find({ subscribed: true });
+          if (subscribers.length > 0) {
+            const emails = subscribers.map(s => s.email);
+            const emailTemplate = getEventNotificationEmail(
+              newEvent.title,
+              newEvent.description,
+              `${newEvent.date} at ${newEvent.time}`,
+              `${process.env.FRONTEND_URL || 'http://localhost:5173'}/events/${newEvent._id}`
+            );
+            
+            await sendEmail({
+              to: emails,
+              subject: emailTemplate.subject,
+              html: emailTemplate.html,
+              text: emailTemplate.text,
+            });
+            
+            console.log(`[Newsletter] Sent event notification to ${emails.length} subscribers`);
+          }
+        } catch (emailError) {
+          console.error('[Newsletter] Failed to send event notification:', emailError);
+        }
+      })();
+      
       res.status(201).json(newEvent);
     } catch (error) {
       console.error("[Backend] Event creation error:", error);
@@ -369,6 +576,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Event deleted" });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete event" });
+    }
+  });
+
+  // ==================== EVENT REVIEWS ====================
+  app.post("/api/events/:id/reviews", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({ error: "Invalid event ID" });
+      }
+
+      // Validate data
+      try {
+        var validatedData = reviewCreateSchema.parse(req.body);
+      } catch (validationError) {
+        if (validationError instanceof z.ZodError) {
+          const errorMessages = validationError.errors
+            .map(e => {
+              if (e.code === 'too_small') {
+                return `${e.path[0]} must be at least ${e.minimum} characters`;
+              }
+              return `${e.path[0]}: ${e.message}`;
+            })
+            .join(", ");
+          return res.status(400).json({ error: "Invalid review data: " + errorMessages });
+        }
+        throw validationError;
+      }
+      
+      const review = new EventReview({
+        ...validatedData,
+        eventId: req.params.id,
+        userId: req.user!._id,
+      });
+      await review.save();
+
+      // Update event average rating
+      const allReviews = await EventReview.find({ eventId: req.params.id });
+      const avgRating = allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;
+
+      await Event.findByIdAndUpdate(req.params.id, {
+        averageRating: avgRating,
+        reviewCount: allReviews.length,
+      });
+
+      res.status(201).json(review);
+    } catch (error) {
+      console.error("Event review creation error:", error);
+      res.status(500).json({ error: "Failed to create review" });
+    }
+  });
+
+  app.get("/api/events/:id/reviews", async (req, res) => {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({ error: "Invalid event ID" });
+      }
+
+      const reviews = await EventReview.find({ eventId: req.params.id })
+        .sort({ createdAt: -1 });
+      res.json(reviews);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch reviews" });
     }
   });
 
@@ -448,8 +717,161 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== EVENT SUGGESTIONS ====================
+  app.post("/api/event-suggestions", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { title, location, difficulty, date, time, maxParticipants, description, imageUrl, isPaid, price, currency } = req.body;
+
+      // Basic validation
+      if (!title || !location || !description || !date) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      const suggestion = new EventSuggestion({
+        userId: req.user!._id,
+        title,
+        location,
+        difficulty,
+        date,
+        time,
+        maxParticipants: maxParticipants ? parseInt(maxParticipants) : undefined,
+        description,
+        imageUrl,
+        isPaid: isPaid || false,
+        price: price ? parseFloat(price) : undefined,
+        currency: currency || "RWF",
+        status: "pending",
+      });
+
+      await suggestion.save();
+      res.status(201).json(suggestion);
+    } catch (error) {
+      console.error("Event suggestion error:", error);
+      res.status(500).json({ error: "Failed to submit suggestion" });
+    }
+  });
+
+  app.get("/api/admin/event-suggestions", requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const suggestions = await EventSuggestion.find()
+        .populate("userId", "username email")
+        .sort({ createdAt: -1 });
+      res.json(suggestions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch suggestions" });
+    }
+  });
+
+  app.put("/api/admin/event-suggestions/:id/approve", requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({ error: "Invalid suggestion ID" });
+      }
+
+      const suggestion = await EventSuggestion.findById(req.params.id).populate("userId");
+      if (!suggestion) {
+        return res.status(404).json({ error: "Suggestion not found" });
+      }
+
+      // Create event from suggestion
+      const event = new Event({
+        title: suggestion.title,
+        location: suggestion.location,
+        difficulty: suggestion.difficulty,
+        date: suggestion.date,
+        time: suggestion.time,
+        maxParticipants: suggestion.maxParticipants,
+        description: suggestion.description,
+        imageUrl: suggestion.imageUrl,
+        isPaid: suggestion.isPaid,
+        price: suggestion.price,
+        currency: suggestion.currency,
+        currentParticipants: 0,
+        averageRating: 0,
+        reviewCount: 0,
+      });
+
+      await event.save();
+
+      // Update suggestion status
+      suggestion.status = "approved";
+      await suggestion.save();
+
+      // Send approval email to user
+      try {
+        const user = suggestion.userId as any;
+        if (user && user.email) {
+          const eventUrl = `${process.env.FRONTEND_URL || 'http://localhost:5174'}/events/${event._id}`;
+          const emailContent = getEventSuggestionApprovedEmail(
+            suggestion.title,
+            suggestion.description,
+            suggestion.date,
+            eventUrl
+          );
+          await sendEmail({
+            to: user.email,
+            subject: emailContent.subject,
+            html: emailContent.html,
+            text: emailContent.text,
+          });
+          console.log(`[Email] Approval notification sent to ${user.email}`);
+        }
+      } catch (emailError) {
+        console.error("[Email] Failed to send approval notification:", emailError);
+        // Don't fail the request if email fails
+      }
+
+      res.json({ message: "Event created from suggestion", event });
+    } catch (error) {
+      console.error("Approval error:", error);
+      res.status(500).json({ error: "Failed to approve suggestion" });
+    }
+  });
+
+  app.put("/api/admin/event-suggestions/:id/reject", requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({ error: "Invalid suggestion ID" });
+      }
+
+      const { reason } = req.body;
+
+      const suggestion = await EventSuggestion.findById(req.params.id).populate("userId");
+      if (!suggestion) {
+        return res.status(404).json({ error: "Suggestion not found" });
+      }
+
+      // Update suggestion status
+      suggestion.status = "rejected";
+      suggestion.rejectionReason = reason || "";
+      await suggestion.save();
+
+      // Send rejection email to user
+      try {
+        const user = suggestion.userId as any;
+        if (user && user.email) {
+          const emailContent = getEventSuggestionRejectedEmail(suggestion.title, reason);
+          await sendEmail({
+            to: user.email,
+            subject: emailContent.subject,
+            html: emailContent.html,
+            text: emailContent.text,
+          });
+          console.log(`[Email] Rejection notification sent to ${user.email}`);
+        }
+      } catch (emailError) {
+        console.error("[Email] Failed to send rejection notification:", emailError);
+        // Don't fail the request if email fails
+      }
+
+      res.json(suggestion);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to reject suggestion" });
+    }
+  });
+
   // ==================== BLOG ROUTES ====================
-  app.get("/api/blog", async (req, res) => {
+  app.get("/api/blog", optionalAuth, async (req: AuthRequest, res) => {
     try {
       // If admin, return all posts; otherwise only published
       const filter = req.user?.role === "admin" ? {} : { published: true };
@@ -460,7 +882,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/blog/:id", async (req, res) => {
+  app.get("/api/blog/:id", optionalAuth, async (req: AuthRequest, res) => {
     try {
       if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
         return res.status(400).json({ error: "Invalid post ID" });
@@ -471,8 +893,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Blog post not found" });
       }
 
-      // Get related posts from same category
-      const related = await BlogPost.find({ category: post.category, _id: { $ne: req.params.id } })
+      // Check if user can view this post (admin or published)
+      if (!post.published && req.user?.role !== "admin") {
+        return res.status(403).json({ error: "This blog post is not published yet" });
+      }
+
+      // Get related posts from same category (only published ones for non-admins)
+      const relatedFilter = req.user?.role === "admin" 
+        ? { category: post.category, _id: { $ne: req.params.id } }
+        : { category: post.category, _id: { $ne: req.params.id }, published: true };
+      
+      const related = await BlogPost.find(relatedFilter)
         .limit(3)
         .populate("author", "username");
 
@@ -501,6 +932,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         published: req.body.published ?? false,
       });
       await newPost.save();
+      
+      // Notify newsletter subscribers only if published
+      if (newPost.published) {
+        (async () => {
+          try {
+            const subscribers = await Newsletter.find({ subscribed: true });
+            if (subscribers.length > 0) {
+              const emails = subscribers.map(s => s.email);
+              const emailTemplate = getBlogNotificationEmail(
+                newPost.title,
+                newPost.excerpt || newPost.content.substring(0, 150),
+                `${process.env.FRONTEND_URL || 'http://localhost:5173'}/blog/${newPost.slug}`
+              );
+              
+              await sendEmail({
+                to: emails,
+                subject: emailTemplate.subject,
+                html: emailTemplate.html,
+                text: emailTemplate.text,
+              });
+              
+              console.log(`[Newsletter] Sent blog notification to ${emails.length} subscribers`);
+            }
+          } catch (emailError) {
+            console.error('[Newsletter] Failed to send blog notification:', emailError);
+          }
+        })();
+      }
+      
       res.status(201).json(newPost);
     } catch (error: any) {
       console.error("Blog creation error:", error);
@@ -579,8 +1039,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid email address" });
       }
 
-      // For now, just store in a simple collection or log it
-      // In production, you'd integrate with a service like Mailchimp or SendGrid
+      // Check if already subscribed
+      let subscription = await Newsletter.findOne({ email: email.toLowerCase() });
+      
+      if (subscription) {
+        // Resubscribe if previously unsubscribed
+        subscription.subscribed = true;
+        subscription.subscribedAt = new Date();
+        subscription.unsubscribedAt = undefined;
+        await subscription.save();
+      } else {
+        // Create new subscription
+        subscription = await Newsletter.create({
+          email: email.toLowerCase(),
+          subscribed: true,
+          subscribedAt: new Date(),
+        });
+      }
+      
       console.log(`[Newsletter] New subscription: ${email}`);
       
       res.status(200).json({ 
@@ -592,6 +1068,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to subscribe to newsletter" });
     }
   });
+
+  // Unsubscribe from newsletter
+  app.post("/api/newsletter/unsubscribe", async (req: AuthRequest, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email || !email.includes("@")) {
+        return res.status(400).json({ error: "Invalid email address" });
+      }
+
+      await Newsletter.findOneAndUpdate(
+        { email: email.toLowerCase() },
+        { 
+          subscribed: false,
+          unsubscribedAt: new Date(),
+        }
+      );
+      
+      console.log(`[Newsletter] Unsubscribed: ${email}`);
+      
+      res.status(200).json({ message: "Successfully unsubscribed from newsletter" });
+    } catch (error) {
+      console.error("Newsletter unsubscribe error:", error);
+      res.status(500).json({ error: "Failed to unsubscribe from newsletter" });
+    }
+  });
+
 
   // ==================== USER PROFILE ROUTES ====================
   app.get("/api/user/profile", requireAuth, async (req: AuthRequest, res) => {
@@ -662,6 +1165,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  app.delete("/api/admin/users/:id", requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({ error: "Invalid user ID" });
+      }
+
+      // Prevent admins from deleting themselves
+      if (req.user?._id.toString() === req.params.id) {
+        return res.status(400).json({ error: "Cannot delete your own account" });
+      }
+
+      const user = await User.findByIdAndDelete(req.params.id);
+
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Optional: Also delete user's data (suggestions, registrations, reviews, etc.)
+      await EventSuggestion.deleteMany({ userId: req.params.id });
+      await EventRegistration.deleteMany({ userId: req.params.id });
+      await TrailReview.deleteMany({ userId: req.params.id });
+      await EventReview.deleteMany({ userId: req.params.id });
+
+      res.json({ message: "User deleted successfully" });
+    } catch (error) {
+      console.error("Delete user error:", error);
+      res.status(500).json({ error: "Failed to delete user" });
     }
   });
 
@@ -755,7 +1288,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update payment record
       payment.status = "completed";
-      payment.stripeChargeId = paymentIntent.charges.data[0]?.id;
+      payment.stripeChargeId = (paymentIntent as any).charges?.data[0]?.id;
       payment.paidAt = new Date();
       await payment.save();
 

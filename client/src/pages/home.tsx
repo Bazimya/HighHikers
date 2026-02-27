@@ -22,7 +22,7 @@ export default function Home() {
     "/assets/alpine-lake.jpg": alpineLake,
   };
 
-  const featuredTrails = trails?.filter((t) => t.featured === 1).slice(0, 3) || [];
+  const featuredTrails = trails?.filter((t) => t.featured).slice(0, 3) || [];
 
   const stats = [
     { label: "Organized Hikes", value: "15+", icon: Mountain },

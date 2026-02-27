@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Clock, ArrowRight, Plus } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
@@ -38,7 +38,10 @@ export default function Blog() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error("Create failed");
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Create failed");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -63,7 +66,7 @@ export default function Blog() {
 
   const filteredPosts = blogPosts.filter((post) => {
     const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         post.excerpt.toLowerCase().includes(searchQuery.toLowerCase());
+                         post.excerpt?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = !selectedCategory || selectedCategory === "All" || post.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -94,7 +97,7 @@ export default function Blog() {
               <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Create New Blog Post</DialogTitle>
-                </DialogHeader>
+                  <DialogDescription>Share your hiking knowledge and experiences with our community.</DialogDescription>                </DialogHeader>
                 {error && <div className="text-sm text-red-600 mb-4">{error}</div>}
                 <div className="space-y-4">
                   <Input placeholder="Post Title" value={blogForm.title} onChange={(e) => setBlogForm({...blogForm, title: e.target.value})} />
@@ -198,14 +201,14 @@ export default function Blog() {
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                       <Avatar className="h-8 w-8">
-                        <AvatarImage src={post.authorAvatar} />
+                        <AvatarImage src={(post as any).authorAvatar} />
                         <AvatarFallback className="text-xs bg-primary/10 text-primary">
                           {getAuthorInitials(post.author)}
                         </AvatarFallback>
                       </Avatar>
                       <div className="text-sm">
                         <div className="text-foreground font-medium">
-                          {typeof post.author === "string" ? post.author : post.author?.username || "Anonymous"}
+                          {typeof post.author === "string" ? post.author : (post.author as any)?.username || "Anonymous"}
                         </div>
                       </div>
                     </div>
@@ -214,9 +217,9 @@ export default function Blog() {
                   <div className="flex items-center justify-between text-sm text-muted-foreground mb-4">
                     <span className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
-                      {post.readTime}
+                      {(post as any).readTime}
                     </span>
-                    <span>{post.publishedAt}</span>
+                    <span>{post.published ? "Published" : "Draft"}</span>
                   </div>
 
                   <Button variant="outline" className="w-full" data-testid={`button-read-${post.id}`}>

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar, Clock, MapPin, Users, Plus } from "lucide-react";
 import { useState } from "react";
@@ -31,6 +31,34 @@ export default function Events() {
     queryKey: ["/api/events"],
   });
 
+  const suggestEventMutation = useMutation({
+    mutationFn: async (data: typeof eventForm) => {
+      const payload = {
+        ...data,
+        maxParticipants: data.maxParticipants ? parseInt(data.maxParticipants) : undefined,
+        price: data.price ? parseFloat(data.price) : undefined,
+      };
+      const res = await fetch("/api/event-suggestions", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Submission failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
+      setEventForm({ title: "", location: "", difficulty: "moderate", date: "", time: "", maxParticipants: "", description: "", imageUrl: "", isPaid: false, price: "", currency: "RWF" });
+      setShowNewEventModal(false);
+      setError("");
+    },
+    onError: (err) => setError(err.message),
+  });
+
   const createEventMutation = useMutation({
     mutationFn: async (data: typeof eventForm) => {
       const payload = {
@@ -46,7 +74,7 @@ export default function Events() {
       });
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.error || "Create failed");
+        throw new Error(error.error || "Creation failed");
       }
       return res.json();
     },
@@ -94,17 +122,21 @@ export default function Events() {
               Join our community on group hikes, workshops, and outdoor adventures. All skill levels welcome!
             </p>
           </div>
-          {user?.role === "admin" && (
-            <Dialog open={showNewEventModal} onOpenChange={setShowNewEventModal}>
-              <DialogTrigger asChild>
-                <Button className="whitespace-nowrap"><Plus className="mr-2 h-4 w-4" /> New Event</Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Create New Event</DialogTitle>
-                </DialogHeader>
-                {error && <div className="text-sm text-red-600 mb-4">{error}</div>}
-                <div className="space-y-4">
+        </div>
+
+        <Dialog open={showNewEventModal} onOpenChange={setShowNewEventModal}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{user?.role === "admin" ? "Create a New Event" : "Suggest a New Event"}</DialogTitle>
+              <DialogDescription>
+                {user?.role === "admin" 
+                  ? "Create a new event that will be displayed immediately on the events page."
+                  : "Have an event idea? Share it with our admins, and they'll review it for approval."
+                }
+              </DialogDescription>
+            </DialogHeader>
+            {error && <div className="text-sm text-red-600 mb-4">{error}</div>}
+            <div className="space-y-4">
                   <Input placeholder="Event Title" value={eventForm.title} onChange={(e) => setEventForm({...eventForm, title: e.target.value})} />
                   <Input placeholder="Location" value={eventForm.location} onChange={(e) => setEventForm({...eventForm, location: e.target.value})} />
                   <Select value={eventForm.difficulty} onValueChange={(v) => setEventForm({...eventForm, difficulty: v})}>
@@ -129,14 +161,21 @@ export default function Events() {
                       </Select>
                     </>
                   )}
-                  <Button onClick={() => createEventMutation.mutate(eventForm)} disabled={createEventMutation.isPending} className="w-full">
-                    {createEventMutation.isPending ? "Creating..." : "Create Event"}
+                  <Button onClick={() => {
+                    if (user?.role === "admin") {
+                      createEventMutation.mutate(eventForm);
+                    } else {
+                      suggestEventMutation.mutate(eventForm);
+                    }
+                  }} disabled={user?.role === "admin" ? createEventMutation.isPending : suggestEventMutation.isPending} className="w-full">
+                    {user?.role === "admin" 
+                      ? (createEventMutation.isPending ? "Creating Event..." : "Create Event")
+                      : (suggestEventMutation.isPending ? "Submitting Suggestion..." : "Submit Suggestion")
+                    }
                   </Button>
                 </div>
               </DialogContent>
             </Dialog>
-          )}
-        </div>
 
         {isError ? (
           <div className="text-center py-12">
@@ -248,10 +287,13 @@ export default function Events() {
 
         <div className="mt-12 text-center">
           <p className="text-muted-foreground mb-4">
-            Want to organize your own event or suggest a new hike?
+            {user?.role === "admin" 
+              ? "Ready to create a new event?"
+              : "Want to suggest a new event or hike?"
+            }
           </p>
           <Button variant="outline" size="lg" data-testid="button-suggest-event" onClick={() => setShowNewEventModal(true)}>
-            Suggest an Event
+            {user?.role === "admin" ? "Create New Event" : "Suggest an Event"}
           </Button>
         </div>
 
