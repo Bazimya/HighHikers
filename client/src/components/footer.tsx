@@ -59,7 +59,7 @@ export function Footer() {
               <Button variant="ghost" size="icon" className="rounded-full" data-testid="button-social-instagram" onClick={() => window.open("https://instagram.com/high_hikerrs", "_blank")}>
                 <Instagram className="h-5 w-5" />
               </Button>
-              <Button variant="ghost" size="icon" className="rounded-full" data-testid="button-social-youtube" onClick={() => window.open("https://youtube.com/@highhikers", "_blank")}>
+              <Button variant="ghost" size="icon" className="rounded-full" data-testid="button-social-youtube" onClick={() => window.open("https://youtube.com/@HIGH_HIKERS", "_blank")}>
                 <Youtube className="h-5 w-5" />
               </Button>
             </div>
