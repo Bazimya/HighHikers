@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertCircle, Plus, Edit2, Trash2, Users, Mountain, Calendar, FileText, CheckCircle, XCircle } from "lucide-react";
+import { FileUpload } from "@/components/file-upload";
 import type { TrailType, EventType, BlogPostType, UserType } from "@shared/schema";
 
 export default function AdminDashboard() {
@@ -30,6 +31,7 @@ export default function AdminDashboard() {
   const [trailForm, setTrailForm] = useState({ name: "", location: "", difficulty: "medium", distance: "", elevation: "", duration: "", description: "", imageUrl: "" });
   const [eventForm, setEventForm] = useState({ title: "", location: "", difficulty: "medium", date: "", time: "", maxParticipants: "", description: "", imageUrl: "", isPaid: false, price: "", currency: "RWF" });
   const [blogForm, setBlogForm] = useState({ title: "", excerpt: "", content: "", category: "", author: "", imageUrl: "", published: true });
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   // Redirect if not admin
   if (!user?.role || user.role !== "admin") {
@@ -364,18 +366,21 @@ export default function AdminDashboard() {
                         value={trailForm.duration}
                         onChange={(e) => setTrailForm({ ...trailForm, duration: e.target.value })}
                       />
-                      <Input
-                        placeholder="Image URL"
-                        value={trailForm.imageUrl}
-                        onChange={(e) => setTrailForm({ ...trailForm, imageUrl: e.target.value })}
+                      <FileUpload 
+                        onFileSelect={(url) => setTrailForm({ ...trailForm, imageUrl: url })} 
+                        currentUrl={trailForm.imageUrl} 
+                        label="Trail Image"
+                        onUploadStart={() => setIsUploadingImage(true)}
+                        onUploadComplete={() => setIsUploadingImage(false)}
                       />
                       <Textarea
                         placeholder="Description"
                         value={trailForm.description}
                         onChange={(e) => setTrailForm({ ...trailForm, description: e.target.value })}
                       />
-                      <Button onClick={() => createTrailMutation.mutate(trailForm)} disabled={createTrailMutation.isPending}>
-                        {createTrailMutation.isPending ? "Creating..." : "Create Trail"}
+                      {isUploadingImage && <p className="text-sm text-blue-600">⏳ Image uploading...</p>}
+                      <Button onClick={() => createTrailMutation.mutate(trailForm)} disabled={createTrailMutation.isPending || isUploadingImage}>
+                        {createTrailMutation.isPending ? "Creating..." : isUploadingImage ? "⏳ Image uploading..." : "Create Trail"}
                       </Button>
                     </div>
                   </DialogContent>
@@ -468,10 +473,12 @@ export default function AdminDashboard() {
                         value={eventForm.maxParticipants}
                         onChange={(e) => setEventForm({ ...eventForm, maxParticipants: e.target.value })}
                       />
-                      <Input
-                        placeholder="Image URL"
-                        value={eventForm.imageUrl}
-                        onChange={(e) => setEventForm({ ...eventForm, imageUrl: e.target.value })}
+                      <FileUpload 
+                        onFileSelect={(url) => setEventForm({ ...eventForm, imageUrl: url })} 
+                        currentUrl={eventForm.imageUrl} 
+                        label="Event Image"
+                        onUploadStart={() => setIsUploadingImage(true)}
+                        onUploadComplete={() => setIsUploadingImage(false)}
                       />
                       <Textarea
                         placeholder="Description"
@@ -512,8 +519,9 @@ export default function AdminDashboard() {
                         </>
                       )}
                       
-                      <Button onClick={() => createEventMutation.mutate(eventForm)} disabled={createEventMutation.isPending}>
-                        {createEventMutation.isPending ? "Creating..." : "Create Event"}
+                      {isUploadingImage && <p className="text-sm text-blue-600">⏳ Image uploading...</p>}
+                      <Button onClick={() => createEventMutation.mutate(eventForm)} disabled={createEventMutation.isPending || isUploadingImage}>
+                        {createEventMutation.isPending ? "Creating..." : isUploadingImage ? "⏳ Image uploading..." : "Create Event"}
                       </Button>
                     </div>
                   </DialogContent>
@@ -716,10 +724,12 @@ export default function AdminDashboard() {
                         value={blogForm.author}
                         onChange={(e) => setBlogForm({ ...blogForm, author: e.target.value })}
                       />
-                      <Input
-                        placeholder="Image URL"
-                        value={blogForm.imageUrl}
-                        onChange={(e) => setBlogForm({ ...blogForm, imageUrl: e.target.value })}
+                      <FileUpload 
+                        onFileSelect={(url) => setBlogForm({ ...blogForm, imageUrl: url })} 
+                        currentUrl={blogForm.imageUrl} 
+                        label="Blog Image"
+                        onUploadStart={() => setIsUploadingImage(true)}
+                        onUploadComplete={() => setIsUploadingImage(false)}
                       />
                       <div className="flex items-center gap-2">
                         <input
@@ -733,8 +743,9 @@ export default function AdminDashboard() {
                           Publish immediately (visible to users)
                         </label>
                       </div>
-                      <Button onClick={() => createBlogMutation.mutate(blogForm)} disabled={createBlogMutation.isPending}>
-                        {createBlogMutation.isPending ? "Creating..." : "Create Post"}
+                      {isUploadingImage && <p className="text-sm text-blue-600">⏳ Image uploading...</p>}
+                      <Button onClick={() => createBlogMutation.mutate(blogForm)} disabled={createBlogMutation.isPending || isUploadingImage}>
+                        {createBlogMutation.isPending ? "Creating..." : isUploadingImage ? "⏳ Image uploading..." : "Create Post"}
                       </Button>
                     </div>
                   </DialogContent>
@@ -808,7 +819,7 @@ export default function AdminDashboard() {
                             size="sm"
                             onClick={() => {
                               if (confirm(`Are you sure you want to delete ${u.username}? This action cannot be undone.`)) {
-                                deleteUserMutation.mutate(u.id);
+                                deleteUserMutation.mutate((u as any)._id?.toString() || "");
                               }
                             }}
                             disabled={deleteUserMutation.isPending}

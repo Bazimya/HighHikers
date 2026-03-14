@@ -81,7 +81,7 @@ export interface ITrail extends Document {
     longitude: number;
     name?: string;
   };
-  imageUrl: string;
+  imageUrl?: string;
   images?: Array<{ url: string; caption?: string }>;
   featured?: boolean;
   averageRating: number;
@@ -111,7 +111,7 @@ const trailSchema = new Schema<ITrail>(
       longitude: Number,
       name: String,
     },
-    imageUrl: { type: String, required: true },
+    imageUrl: String,
     images: [{ url: String, caption: String }],
     featured: { type: Boolean, default: false },
     averageRating: { type: Number, default: 0 },
@@ -147,6 +147,7 @@ export interface IEvent extends Document {
     longitude: number;
     name?: string;
   };
+  imageUrl?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -163,7 +164,7 @@ const eventSchema = new Schema<IEvent>(
     difficulty: { type: String, required: true },
     maxParticipants: Number,
     currentParticipants: { type: Number, default: 0 },
-    imageUrl: { type: String, required: true },
+    imageUrl: String,
     featured: { type: Boolean, default: false },
     startPoint: {
       latitude: Number,
@@ -188,7 +189,7 @@ export interface IBlogPost extends Document {
   slug: string;
   content: string;
   excerpt?: string;
-  imageUrl: string;
+  imageUrl?: string;
   author: mongoose.Types.ObjectId;
   category: string;
   tags: string[];
@@ -204,7 +205,7 @@ const blogPostSchema = new Schema<IBlogPost>(
     slug: { type: String, required: true, unique: true },
     content: { type: String, required: true },
     excerpt: String,
-    imageUrl: { type: String, required: true },
+    imageUrl: String,
     author: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     category: String,
     tags: [String],
@@ -489,7 +490,7 @@ export const trailCreateSchema = z.object({
   location: z.string(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
-  imageUrl: z.string(),
+  imageUrl: z.string().optional(),
   featured: z.boolean().optional(),
   averageRating: z.number().optional(),
   reviewCount: z.number().optional(),
@@ -504,7 +505,7 @@ export const eventCreateSchema = z.object({
   location: z.string(),
   difficulty: z.string(),
   maxParticipants: z.number().optional(),
-  imageUrl: z.string(),
+  imageUrl: z.string().optional(),
   isPaid: z.boolean().optional(),
   price: z.number().optional(),
   currency: z.string().optional(),

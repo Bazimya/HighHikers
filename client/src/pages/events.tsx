@@ -12,6 +12,7 @@ import { Calendar, Clock, MapPin, Users, Plus } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { PaymentDialog } from "@/components/payment-dialog";
+import { FileUpload } from "@/components/file-upload";
 import type { Event } from "@shared/schema";
 
 export default function Events() {
@@ -26,6 +27,7 @@ export default function Events() {
   const [showNewEventModal, setShowNewEventModal] = useState(false);
   const [eventForm, setEventForm] = useState({ title: "", location: "", difficulty: "moderate", date: "", time: "", maxParticipants: "", description: "", imageUrl: "", isPaid: false, price: "", currency: "RWF" });
   const [error, setError] = useState("");
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const { data: events = [], isLoading, isError } = useQuery<Event[]>({
     queryKey: ["/api/events"],
@@ -147,7 +149,14 @@ export default function Events() {
                   <Input type="time" value={eventForm.time} onChange={(e) => setEventForm({...eventForm, time: e.target.value})} />
                   <Input placeholder="Max Participants" type="number" value={eventForm.maxParticipants} onChange={(e) => setEventForm({...eventForm, maxParticipants: e.target.value})} />
                   <Textarea placeholder="Description" value={eventForm.description} onChange={(e) => setEventForm({...eventForm, description: e.target.value})} />
-                  <Input placeholder="Image URL" value={eventForm.imageUrl} onChange={(e) => setEventForm({...eventForm, imageUrl: e.target.value})} />
+                  <FileUpload 
+                    onFileSelect={(url) => setEventForm({...eventForm, imageUrl: url})} 
+                    currentUrl={eventForm.imageUrl} 
+                    label="Event Image"
+                    onUploadStart={() => setIsUploadingImage(true)}
+                    onUploadComplete={() => setIsUploadingImage(false)}
+                  />
+                  {isUploadingImage && <p className="text-sm text-blue-600">⏳ Image uploading... Please wait before creating</p>}
                   <div className="flex items-center gap-2">
                     <input type="checkbox" id="isPaid" checked={eventForm.isPaid} onChange={(e) => setEventForm({...eventForm, isPaid: e.target.checked})} />
                     <label htmlFor="isPaid">Paid Event</label>
@@ -167,10 +176,12 @@ export default function Events() {
                     } else {
                       suggestEventMutation.mutate(eventForm);
                     }
-                  }} disabled={user?.role === "admin" ? createEventMutation.isPending : suggestEventMutation.isPending} className="w-full">
-                    {user?.role === "admin" 
-                      ? (createEventMutation.isPending ? "Creating Event..." : "Create Event")
-                      : (suggestEventMutation.isPending ? "Submitting Suggestion..." : "Submit Suggestion")
+                  }} disabled={(user?.role === "admin" ? createEventMutation.isPending : suggestEventMutation.isPending) || isUploadingImage} className="w-full">
+                    {isUploadingImage 
+                      ? "⏳ Image uploading..."
+                      : user?.role === "admin" 
+                        ? (createEventMutation.isPending ? "Creating Event..." : "Create Event")
+                        : (suggestEventMutation.isPending ? "Submitting Suggestion..." : "Submit Suggestion")
                     }
                   </Button>
                 </div>

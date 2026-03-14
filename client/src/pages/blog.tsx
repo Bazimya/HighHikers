@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Clock, ArrowRight, Plus } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
+import { FileUpload } from "@/components/file-upload";
 import type { BlogPost } from "@shared/schema";
 import forestTrail from "@assets/generated_images/Forest_trail_easy_hike_8367c201.png";
 import mountainRidge from "@assets/generated_images/Mountain_ridge_challenging_trail_b017c93a.png";
@@ -25,6 +26,7 @@ export default function Blog() {
   const [showNewBlogModal, setShowNewBlogModal] = useState(false);
   const [blogForm, setBlogForm] = useState({ title: "", excerpt: "", content: "", category: "", author: "", imageUrl: "" });
   const [error, setError] = useState("");
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const { data: blogPosts = [], isLoading, isError } = useQuery<BlogPost[]>({
     queryKey: ["/api/blog"],
@@ -108,9 +110,16 @@ export default function Blog() {
                   </Select>
                   <Textarea placeholder="Excerpt (short summary)" value={blogForm.excerpt} onChange={(e) => setBlogForm({...blogForm, excerpt: e.target.value})} />
                   <Textarea placeholder="Full post content" value={blogForm.content} onChange={(e) => setBlogForm({...blogForm, content: e.target.value})} className="min-h-[200px]" />
-                  <Input placeholder="Image URL" value={blogForm.imageUrl} onChange={(e) => setBlogForm({...blogForm, imageUrl: e.target.value})} />
-                  <Button onClick={() => createBlogMutation.mutate(blogForm)} disabled={createBlogMutation.isPending} className="w-full">
-                    {createBlogMutation.isPending ? "Creating..." : "Create Post"}
+                  <FileUpload 
+                    onFileSelect={(url) => setBlogForm({...blogForm, imageUrl: url})} 
+                    currentUrl={blogForm.imageUrl} 
+                    label="Blog Image"
+                    onUploadStart={() => setIsUploadingImage(true)}
+                    onUploadComplete={() => setIsUploadingImage(false)}
+                  />
+                  {isUploadingImage && <p className="text-sm text-blue-600">⏳ Image uploading... Please wait before creating</p>}
+                  <Button onClick={() => createBlogMutation.mutate(blogForm)} disabled={createBlogMutation.isPending || isUploadingImage} className="w-full">
+                    {createBlogMutation.isPending ? "Creating..." : isUploadingImage ? "⏳ Image uploading..." : "Create Post"}
                   </Button>
                 </div>
               </DialogContent>
@@ -181,7 +190,7 @@ export default function Blog() {
                 <Link href={`/blog/${post._id?.toString() || post.id}`}>
                 <div className="relative aspect-video overflow-hidden">
                   <img
-                    src={imageMap[post.imageUrl] || forestTrail}
+                    src={post.imageUrl?.startsWith("/uploads/") ? post.imageUrl : (imageMap[post.imageUrl] || forestTrail)}
                     alt={post.title}
                     className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                   />

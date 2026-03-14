@@ -145,7 +145,7 @@ export default function TrailDetail() {
         {/* Hero Image */}
         <div className="relative mb-8 rounded-lg overflow-hidden">
           <img
-            src={imageMap[trail.imageUrl] || forestTrail}
+            src={trail.imageUrl?.startsWith("/uploads/") ? trail.imageUrl : (imageMap[trail.imageUrl] || forestTrail)}
             alt={trail.name}
             className="w-full h-96 object-cover"
           />

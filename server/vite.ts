@@ -20,6 +20,14 @@ export function log(message: string, source = "express") {
 }
 
 export async function setupVite(app: Express, server: Server) {
+  // Serve uploaded files BEFORE vite middleware so they're not caught by the catch-all
+  const uploadsPath = path.join(import.meta.dirname, "../dist/public/uploads");
+  app.use("/uploads", express.static(uploadsPath, {
+    maxAge: "1d",
+    etag: false,
+  }));
+  console.log("📁 Serving uploads from:", uploadsPath);
+
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },

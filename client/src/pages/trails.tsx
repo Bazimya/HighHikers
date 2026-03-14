@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { MapPin, Search, ArrowRight, Map as MapIcon, Plus } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { TrailMap } from "@/components/trail-map";
+import { FileUpload } from "@/components/file-upload";
 import type { Trail } from "@shared/schema";
 import forestTrail from "@assets/generated_images/Forest_trail_easy_hike_8367c201.png";
 import mountainRidge from "@assets/generated_images/Mountain_ridge_challenging_trail_b017c93a.png";
@@ -27,6 +28,7 @@ export default function Trails() {
   const [showNewTrailModal, setShowNewTrailModal] = useState(false);
   const [trailForm, setTrailForm] = useState({ name: "", location: "", difficulty: "moderate", distance: "", elevation: "", duration: "", description: "", imageUrl: "" });
   const [error, setError] = useState("");
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const { data: allTrails = [], isLoading, isError } = useQuery<Trail[]>({
     queryKey: ["/api/trails"],
@@ -114,9 +116,25 @@ export default function Trails() {
                   <Input placeholder="Elevation (m)" type="number" value={trailForm.elevation} onChange={(e) => setTrailForm({...trailForm, elevation: e.target.value})} />
                   <Input placeholder="Duration (hours)" type="number" step="0.1" value={trailForm.duration} onChange={(e) => setTrailForm({...trailForm, duration: e.target.value})} />
                   <Textarea placeholder="Description" value={trailForm.description} onChange={(e) => setTrailForm({...trailForm, description: e.target.value})} />
-                  <Input placeholder="Image URL" value={trailForm.imageUrl} onChange={(e) => setTrailForm({...trailForm, imageUrl: e.target.value})} />
-                  <Button onClick={() => createTrailMutation.mutate(trailForm)} disabled={createTrailMutation.isPending} className="w-full">
-                    {createTrailMutation.isPending ? "Creating..." : "Create Trail"}
+                  <FileUpload 
+                    onFileSelect={(url) => {
+                      console.log("📝 Trail form imageUrl updated to:", url);
+                      setTrailForm({...trailForm, imageUrl: url});
+                    }} 
+                    currentUrl={trailForm.imageUrl} 
+                    label="Trail Image"
+                    onUploadStart={() => {
+                      console.log("🔄 Upload started");
+                      setIsUploadingImage(true);
+                    }}
+                    onUploadComplete={() => {
+                      console.log("✅ Upload complete");
+                      setIsUploadingImage(false);
+                    }}
+                  />
+                  {isUploadingImage && <p className="text-sm text-blue-600">⏳ Image uploading... Please wait before creating</p>}
+                  <Button onClick={() => createTrailMutation.mutate(trailForm)} disabled={createTrailMutation.isPending || isUploadingImage} className="w-full">
+                    {createTrailMutation.isPending ? "Creating..." : isUploadingImage ? "⏳ Image uploading..." : "Create Trail"}
                   </Button>
                 </div>
               </DialogContent>
@@ -231,7 +249,7 @@ export default function Trails() {
                 <Link href={`/trails/${trail._id?.toString() || trail.id}`}>
                 <div className="relative aspect-video overflow-hidden">
                   <img
-                    src={imageMap[trail.imageUrl] || forestTrail}
+                    src={trail.imageUrl?.startsWith("/uploads/") ? trail.imageUrl : (imageMap[trail.imageUrl] || forestTrail)}
                     alt={trail.name}
                     className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                   />

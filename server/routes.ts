@@ -3,6 +3,9 @@ import { createServer, type Server } from "http";
 import { z } from "zod";
 import mongoose from "mongoose";
 import Stripe from "stripe";
+import multer from "multer";
+import { mkdir } from "fs/promises";
+import { join } from "path";
 import {
   User,
   Trail,
@@ -33,8 +36,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     apiVersion: "2023-10-16",
   });
 
+  // Setup file upload directory - use process.cwd() or __dirname
+  const uploadsDir = join(import.meta.dirname, "../dist/public/uploads");
+  console.log("📁 Uploads directory:", uploadsDir);
+  try {
+    await mkdir(uploadsDir, { recursive: true });
+    console.log("✅ Uploads directory ready");
+  } catch (err) {
+    console.error("❌ Error creating uploads directory:", err);
+  }
+
+  // Configure multer for file uploads
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, uploadsDir);
+    },
+    filename: (req, file, cb) => {
+      const timestamp = Date.now();
+      const originalName = file.originalname.replace(/\s+/g, "_");
+      const filename = `${timestamp}-${originalName}`;
+      console.log("📝 Saving file as:", filename);
+      cb(null, filename);
+    },
+  });
+
+  const upload = multer({
+    storage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+    fileFilter: (req, file, cb) => {
+      console.log("🔍 Checking file type:", file.mimetype);
+      const allowedMimes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+      if (allowedMimes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error(`Invalid file type: ${file.mimetype}`));
+      }
+    },
+  });
+
   // Apply optional auth middleware to all routes
   app.use(optionalAuth);
+
+  // ==================== FILE UPLOAD ROUTES ====================
+  app.post("/api/upload", requireAuth, (req: AuthRequest, res, next) => {
+    upload.single("file")(req, res, (err) => {
+      if (err instanceof multer.MulterError) {
+        console.error("❌ Multer error:", err.code, err.message);
+        if (err.code === "FILE_TOO_LARGE") {
+          return res.status(400).json({ error: "File is too large (max 10MB)" });
+        }
+        return res.status(400).json({ error: `Upload error: ${err.message}` });
+      } else if (err) {
+        console.error("❌ File upload error:", err);
+        return res.status(400).json({ error: err.message || "File upload failed" });
+      }
+
+      // If we get here, the file was uploaded successfully
+      try {
+        console.log("📤 Upload request received");
+        console.log("👤 User:", req.user?.username);
+        console.log("📄 File:", req.file);
+
+        if (!req.file) {
+          console.error("❌ No file provided");
+          return res.status(400).json({ error: "No file provided" });
+        }
+
+        const fileUrl = `/uploads/${req.file.filename}`;
+        console.log("✅ File uploaded successfully:", fileUrl);
+        res.json({ url: fileUrl });
+      } catch (error) {
+        console.error("❌ Response error:", error);
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
+  });
 
   // ==================== AUTH ROUTES ====================
   app.post("/api/auth/register", async (req: AuthRequest, res) => {
@@ -70,32 +146,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastName: data.lastName,
       });
 
-      // Send OTP for email verification
-      try {
-        const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
-        const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // Expires in 10 minutes
+      // Send OTP for email verification (async - don't block response)
+      const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // Expires in 10 minutes
 
-        await OTP.create({
-          email: data.email,
-          code: otp,
-          expiresAt,
-        });
+      await OTP.create({
+        email: data.email,
+        code: otp,
+        expiresAt,
+      });
 
-        console.log(`[Registration] 🔐 OTP Code for ${data.email}: ${otp}`); // Show in dev mode
+      console.log(`[Registration] 🔐 OTP Code for ${data.email}: ${otp}`); // Show in dev mode
 
-        const emailContent = getOTPEmail(otp);
-        await sendEmail({
-          to: data.email,
-          subject: emailContent.subject,
-          html: emailContent.html,
-          text: emailContent.text,
-        });
-
-        console.log(`[Registration] ✅ OTP sent to ${data.email}`);
-      } catch (emailError) {
-        console.error("[Registration] ⚠️  Failed to send OTP:", emailError instanceof Error ? emailError.message : emailError);
-        // Don't fail registration if email fails
-      }
+      // Send email in background (don't await)
+      (async () => {
+        try {
+          const emailContent = getOTPEmail(otp);
+          console.log(`[Registration] 📧 Attempting to send OTP email to ${data.email}...`);
+          await sendEmail({
+            to: data.email,
+            subject: emailContent.subject,
+            html: emailContent.html,
+            text: emailContent.text,
+          });
+          console.log(`[Registration] ✅ OTP sent to ${data.email}`);
+        } catch (emailError) {
+          console.error(`[Registration] ❌ Failed to send OTP to ${data.email}`);
+          if (emailError instanceof Error) {
+            console.error("[Registration] Error:", emailError.message);
+            if (emailError.message.includes('auth')) {
+              console.error("[Registration] ⚠️  AUTHENTICATION ERROR - Check EMAIL_PASSWORD is a Gmail App Password (16 chars)");
+              console.error("[Registration] Get one at: https://myaccount.google.com/apppasswords");
+            }
+          } else {
+            console.error("[Registration] Error:", emailError);
+          }
+        }
+      })();
 
       return res.status(201).json({
         id: newUser.id,
@@ -140,21 +227,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiresAt,
       });
 
-      // Send OTP email
-      try {
-        const emailContent = getOTPEmail(otp);
-        await sendEmail({
-          to: email,
-          subject: emailContent.subject,
-          html: emailContent.html,
-          text: emailContent.text,
-        });
-
-        console.log(`[Email] ✅ OTP sent to ${email}`);
-      } catch (emailError) {
-        console.error("[Email] ⚠️  Failed to send OTP email:", emailError instanceof Error ? emailError.message : emailError);
-        // Still succeed - OTP is created, user can verify with email or we're in dev mode
-      }
+      // Send OTP email in background (don't await - return immediately)
+      (async () => {
+        try {
+          const emailContent = getOTPEmail(otp);
+          console.log(`[Email] 📧 Attempting to send OTP email to ${email}...`);
+          await sendEmail({
+            to: email,
+            subject: emailContent.subject,
+            html: emailContent.html,
+            text: emailContent.text,
+          });
+          console.log(`[Email] ✅ OTP sent to ${email}`);
+        } catch (emailError) {
+          console.error(`[Email] ❌ Failed to send OTP to ${email}`);
+          if (emailError instanceof Error) {
+            console.error("[Email] Error:", emailError.message);
+            if (emailError.message.includes('auth')) {
+              console.error("[Email] ⚠️  AUTHENTICATION ERROR - Check EMAIL_PASSWORD is a Gmail App Password (16 chars)");
+              console.error("[Email] Get one at: https://myaccount.google.com/apppasswords");
+            }
+          } else {
+            console.error("[Email] Error:", emailError);
+          }
+        }
+      })();
 
       return res.json({ message: "OTP sent to your email. Check spam folder if not received." });
     } catch (error) {
