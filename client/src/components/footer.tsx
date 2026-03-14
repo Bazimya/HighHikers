@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { useState } from "react";
-import { Mountain, Facebook, Instagram, Twitter, Youtube } from "lucide-react";
+import { Mountain, Instagram, Youtube } from "lucide-react";
+import { SiTiktok } from "react-icons/si";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -52,14 +53,11 @@ export function Footer() {
               Discover amazing hiking trails and connect with outdoor enthusiasts. Your next adventure starts here.
             </p>
             <div className="flex gap-2">
-              <Button variant="ghost" size="icon" className="rounded-full" data-testid="button-social-facebook" onClick={() => window.open("https://facebook.com/highhikers", "_blank")}>
-                <Facebook className="h-5 w-5" />
+              <Button variant="ghost" size="icon" className="rounded-full" data-testid="button-social-tiktok" onClick={() => window.open("https://tiktok.com/@hikewithus_2", "_blank")}>
+                <SiTiktok className="h-5 w-5" />
               </Button>
               <Button variant="ghost" size="icon" className="rounded-full" data-testid="button-social-instagram" onClick={() => window.open("https://instagram.com/high_hikerrs", "_blank")}>
                 <Instagram className="h-5 w-5" />
-              </Button>
-              <Button variant="ghost" size="icon" className="rounded-full" data-testid="button-social-twitter" onClick={() => window.open("https://twitter.com/highhikers", "_blank")}>
-                <Twitter className="h-5 w-5" />
               </Button>
               <Button variant="ghost" size="icon" className="rounded-full" data-testid="button-social-youtube" onClick={() => window.open("https://youtube.com/@highhikers", "_blank")}>
                 <Youtube className="h-5 w-5" />
